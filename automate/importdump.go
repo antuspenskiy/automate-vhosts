@@ -3,34 +3,24 @@ package main
 import (
 	"fmt"
 	"os"
-	"time"
-	"flag"
 	"strings"
 	"os/exec"
-	"log"
+	"time"
 
 	"github.com/antuspenskiy/automate-vhosts/branch"
 )
 
 func main() {
-	flag.Parse()
-
-	branchName := flag.Args()
-	if len(branchName) == 1 {
-		log.Fatal("Error: No files specified.")
-	}
-	fmt.Println("Output: Using file:", branchName)
 
 	// Main variables
 	dbDir := "/tmp"
+	dbName := fmt.Sprintf("i_%s", branch.PassArguments())
 	storageDir := "/Users/auspenskii/test"
 	current := time.Now()
-	dumpFilename := fmt.Sprintf(current.Format("20060102.150405"))
-	dumpPath := fmt.Sprintf("%s/dump_%s.sql", dbDir, dumpFilename)
-	fmt.Println(dumpPath)
+	dumpFileFormat := fmt.Sprintf(current.Format("20060102.150405"))
+	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", dbDir, dumpFileFormat)
 
-	// Check if storageDir is exist
-	branch.IsExist(storageDir)
+	// TODO: Check if storageDir exist
 	os.Chdir(storageDir)
 
 	// Pipeline commands
@@ -45,25 +35,37 @@ func main() {
 	}
 
 	// Print the stdout, if any
-	if len(output) > 0 {
-		fmt.Printf("Output: %s", output)
-	}
+	//if len(output) > 0 {
+	//	fmt.Printf("Output: %s\n", output)
+	//}
 
 	// Print the stderr, if any
 	if len(stderr) > 0 {
-		fmt.Printf("%q: (stderr)", stderr)
+		fmt.Printf("%q: (stderr)\n", stderr)
 	}
 
 	// Convert byte output to string, trim it and use in cmd
 	outputStr := string(output[:])
-	outputTrim := strings.TrimSpace(outputStr)
+	dumpFileSrc := strings.TrimSpace(outputStr)
 
 	// Copy last database dump to dbDir
-	branch.ExecCmd("rsync", "-P", "-t", outputTrim, dbDir)
+	branch.ExecCmd("rsync", "-P", "-t", dumpFileSrc, dbDir)
 
 	os.Chdir(dbDir)
 
-	// Extract database dump
-	branch.UnpackGzipFile(outputTrim, dumpPath)
+	// Extract database dump, use time() for each extracted file *.sql
+	branch.UnpackGzipFile(dumpFileSrc, dumpFileDst)
 
+	// Prepare database
+	branch.ExecCmd("mysql", "-u", "test", "-e", fmt.Sprintf("DROP DATABASE IF EXISTS %s; "+
+		"CREATE DATABASE %s CHARACTER SET utf8 collate utf8_unicode_ci; "+
+		"GRANT ALL PRIVILEGES ON %s.* TO '%s'@'localhost' IDENTIFIED BY '%s';", dbName, dbName, dbName, dbName, dbName))
+
+	// Import database dump
+	// TODO: Use password
+	branch.ExecCmd("bash", "-c", fmt.Sprintf("mysql -utest %s < %s", dbName, dumpFileDst))
+
+	// Delete database dump's
+	branch.DeleteFile(dumpFileSrc)
+	branch.DeleteFile(dumpFileDst)
 }

@@ -8,22 +8,35 @@ import (
 	"strings"
 	"io"
 	"compress/gzip"
+	"flag"
+	"regexp"
+	"log"
 )
 
-func IsExist(path string) bool {
-	if _, err := os.Stat(path); err == nil {
-		fmt.Printf("Output: File or directory exists: %s\n", path)
-		return true
+func PassArguments() string {
+	NameBranch := flag.String("branch", "66-chuck-norris", "Branch name")
+	flag.Parse()
+	fmt.Printf("Output: Branch name is %q.", *NameBranch)
+
+	NameBranchToString := *NameBranch
+
+	// Remove all Non-Alphanumeric Characters from a NameBranch
+	reg, err := regexp.Compile("[^a-zA-Z0-9]+")
+	if err != nil {
+		log.Fatal(err)
 	}
-	fmt.Printf("Error: No such file or directory: %s\n", path)
-	return false
+	processedBranchString := reg.ReplaceAllString(NameBranchToString, "")
+
+	fmt.Printf("A Branch name of %s becomes %s. \n\n", NameBranchToString, processedBranchString)
+
+	return processedBranchString
 }
 
 func ExecCmd(path string, args ...string) {
 	fmt.Printf("Running: %q %q\n", path, strings.Join(args, " "))
 	cmd := exec.Command(path, args...)
 	bs, err := cmd.CombinedOutput()
-	fmt.Printf("Output: %s", bs)
+	fmt.Printf("Output: %s\n", bs)
 	fmt.Printf("Error: %v\n\n", err)
 }
 
@@ -102,4 +115,12 @@ func UnpackGzipFile(gzFilePath, dstFilePath string) (int64, error) {
 	dstFile.Close()
 
 	return written, nil
+}
+
+func DeleteFile(path string) {
+	err := os.Remove(path)
+	if err != nil {
+		fmt.Printf("Error: %v\n\n", err)
+	}
+	fmt.Printf("Output: Deleted %s\n", path)
 }
