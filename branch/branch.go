@@ -32,6 +32,14 @@ func PassArguments() string {
 	return processedBranchString
 }
 
+func PathExist(_path string) bool {
+	_, err := os.Stat(_path)
+	if err != nil && os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
 func ExecCmd(path string, args ...string) {
 	fmt.Printf("Running: %q %q\n", path, strings.Join(args, " "))
 	cmd := exec.Command(path, args...)

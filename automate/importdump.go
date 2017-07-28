@@ -6,6 +6,7 @@ import (
 	"time"
 	"os/exec"
 	"strings"
+
 	"github.com/antuspenskiy/automate-vhosts/branch"
 )
 
@@ -20,8 +21,12 @@ func main() {
 	dumpFileFormat := fmt.Sprintf(current.Format("20060102.150405"))
 	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", dbDir, dumpFileFormat)
 
-	// TODO: Check if storageDir exist
-	os.Chdir(storageDir)
+	if branch.PathExist(storageDir) {
+		os.Chdir(storageDir)
+	} else {
+		fmt.Printf("Error: No such file or directory %v\n", storageDir)
+		os.Exit(1)
+	}
 
 	// Pipeline commands
 	ls := exec.Command("find", ".", "-name", "*.sql.gz")
