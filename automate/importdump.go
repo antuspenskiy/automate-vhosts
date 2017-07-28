@@ -3,19 +3,19 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
-	"os/exec"
 	"time"
-
+	"os/exec"
+	"strings"
 	"github.com/antuspenskiy/automate-vhosts/branch"
 )
+
+const dbDir = "/tmp"
+const storageDir = "/Users/auspenskii/test"
 
 func main() {
 
 	// Main variables
-	dbDir := "/tmp"
 	dbName := fmt.Sprintf("i_%s", branch.PassArguments())
-	storageDir := "/Users/auspenskii/test"
 	current := time.Now()
 	dumpFileFormat := fmt.Sprintf(current.Format("20060102.150405"))
 	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", dbDir, dumpFileFormat)
@@ -45,8 +45,8 @@ func main() {
 	}
 
 	// Convert byte output to string, trim it and use in cmd
-	outputStr := string(output[:])
-	dumpFileSrc := strings.TrimSpace(outputStr)
+	dumpFileStr := string(output[:])
+	dumpFileSrc := strings.TrimSpace(dumpFileStr)
 
 	// Copy last database dump to dbDir
 	branch.ExecCmd("rsync", "-P", "-t", dumpFileSrc, dbDir)
