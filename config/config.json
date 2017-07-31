@@ -1,0 +1,15 @@
+{
+  "testing": {
+    "key1": "",
+    "key2": "",
+    "key3": ""
+  },
+  "production": {
+    "key1": "",
+    "key2": "",
+    "key3": ""
+  },
+  "rootDir": "/var/web",
+  "dbDir": "/tmp",
+  "storageDir": "/Users/auspenskii/test"
+}

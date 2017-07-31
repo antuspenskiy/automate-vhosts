@@ -10,21 +10,22 @@ import (
 	"github.com/antuspenskiy/automate-vhosts/branch"
 )
 
-const dbDir = "/tmp"
-const storageDir = "/Users/auspenskii/test"
-
 func main() {
+
+	c := branch.LoadConfig("../config/config.json")
+
+	fmt.Printf("%+v\n\n", c)
 
 	// Main variables
 	dbName := fmt.Sprintf("i_%s", branch.PassArguments())
 	current := time.Now()
 	dumpFileFormat := fmt.Sprintf(current.Format("20060102.150405"))
-	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", dbDir, dumpFileFormat)
+	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", c.DatabaseDir, dumpFileFormat)
 
-	if branch.PathExist(storageDir) {
-		os.Chdir(storageDir)
+	if branch.PathExist(c.StorageDir) {
+		os.Chdir(c.StorageDir)
 	} else {
-		fmt.Printf("Error: No such file or directory %v\n", storageDir)
+		fmt.Printf("Error: No such file or directory %v\n", c.StorageDir)
 		os.Exit(1)
 	}
 
@@ -54,9 +55,9 @@ func main() {
 	dumpFileSrc := strings.TrimSpace(dumpFileStr)
 
 	// Copy last database dump to dbDir
-	branch.ExecCmd("rsync", "-P", "-t", dumpFileSrc, dbDir)
+	branch.ExecCmd("rsync", "-P", "-t", dumpFileSrc, c.DatabaseDir)
 
-	os.Chdir(dbDir)
+	os.Chdir(c.StorageDir)
 
 	// Extract database dump, use time() for each extracted file *.sql
 	branch.UnpackGzipFile(dumpFileSrc, dumpFileDst)
