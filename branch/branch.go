@@ -11,7 +11,29 @@ import (
 	"flag"
 	"regexp"
 	"log"
+	"io/ioutil"
+	"encoding/json"
 )
+
+type Configuration struct {
+	TestEnv     Testing
+	ProdEnv     Production
+	RootDir     string `json:"rootDir"`
+	DatabaseDir string `json:"dbDir"`
+	StorageDir  string `json:"storageDir"`
+}
+
+type Testing struct {
+	Key1 string `json:""`
+	Key2 string `json:""`
+	Key3 string `json:""`
+}
+
+type Production struct {
+	Key1 string `json:""`
+	Key2 string `json:""`
+	Key3 string `json:""`
+}
 
 func PassArguments() string {
 	NameBranch := flag.String("branch", "66-chuck-norris", "Branch name")
@@ -30,6 +52,21 @@ func PassArguments() string {
 	fmt.Printf("A Branch name of %s becomes %s. \n\n", NameBranchToString, processedBranchString)
 
 	return processedBranchString
+}
+
+func LoadConfig(path string) Configuration {
+	file, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Fatal("Config File Missing. ", err)
+	}
+
+	var config Configuration
+	err = json.Unmarshal(file, &config)
+	if err != nil {
+		log.Fatal("Config Parse Error: ", err)
+	}
+
+	return config
 }
 
 func PathExist(_path string) bool {
