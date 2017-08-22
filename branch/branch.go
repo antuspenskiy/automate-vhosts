@@ -6,13 +6,12 @@ import (
 	"bytes"
 	"os"
 	"strings"
-	"io"
-	"compress/gzip"
 	"flag"
 	"regexp"
 	"log"
-	"io/ioutil"
 	"encoding/json"
+	"io"
+	"compress/gzip"
 )
 
 type Configuration struct {
@@ -54,19 +53,16 @@ func PassArguments() string {
 	return processedBranchString
 }
 
-func LoadConfig(path string) Configuration {
-	file, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Fatal("Config File Missing. ", err)
-	}
-
+func LoadConfiguration(file string) (Configuration, error) {
 	var config Configuration
-	err = json.Unmarshal(file, &config)
+	configFile, err := os.Open(file)
+	defer configFile.Close()
 	if err != nil {
-		log.Fatal("Config Parse Error: ", err)
+		fmt.Println(err.Error())
 	}
-
-	return config
+	jsonParser := json.NewDecoder(configFile)
+	jsonParser.Decode(&config)
+	return config, err
 }
 
 func PathExist(_path string) bool {

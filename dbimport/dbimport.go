@@ -3,21 +3,21 @@ package main
 import (
 	"fmt"
 	"os"
-	"time"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/antuspenskiy/automate-vhosts/branch"
 )
 
 func main() {
 
-	c := branch.LoadConfig("../config/config.json")
-
+	c, _ := branch.LoadConfiguration("./config/config.json")
 	fmt.Printf("%+v\n\n", c)
 
 	// Main variables
 	dbName := fmt.Sprintf("i_%s", branch.PassArguments())
+
 	current := time.Now()
 	dumpFileFormat := fmt.Sprintf(current.Format("20060102.150405"))
 	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", c.DatabaseDir, dumpFileFormat)
@@ -54,12 +54,12 @@ func main() {
 	dumpFileStr := string(output[:])
 	dumpFileSrc := strings.TrimSpace(dumpFileStr)
 
-	// Copy last database dump to dbDir
+	// Copy last database dbdump to dbDir
 	branch.ExecCmd("rsync", "-P", "-t", dumpFileSrc, c.DatabaseDir)
 
 	os.Chdir(c.StorageDir)
 
-	// Extract database dump, use time() for each extracted file *.sql
+	// Extract database dbdump, use time() for each extracted file *.sql
 	branch.UnpackGzipFile(dumpFileSrc, dumpFileDst)
 
 	// Prepare database
@@ -67,11 +67,11 @@ func main() {
 		"CREATE DATABASE %s CHARACTER SET utf8 collate utf8_unicode_ci; "+
 		"GRANT ALL PRIVILEGES ON %s.* TO '%s'@'localhost' IDENTIFIED BY '%s';", dbName, dbName, dbName, dbName, dbName))
 
-	// Import database dump
+	// Import database dbdump
 	// TODO: Use password
 	branch.ExecCmd("bash", "-c", fmt.Sprintf("mysql -utest %s < %s", dbName, dumpFileDst))
 
-	// Delete database dump's
+	// Delete database dbdump's
 	branch.DeleteFile(dumpFileSrc)
 	branch.DeleteFile(dumpFileDst)
 }
