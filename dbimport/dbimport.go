@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"encoding/json"
 
 	"github.com/antuspenskiy/automate-vhosts/branch"
 )
@@ -13,7 +14,13 @@ import (
 func main() {
 
 	c, _ := branch.LoadConfiguration("./config/config.json")
-	fmt.Printf("%+v\n\n", c)
+
+	// Pretty JSON configuration
+	b, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	os.Stdout.Write(b)
 
 	// Main variables
 	dbName := fmt.Sprintf("i_%s", branch.PassArguments())

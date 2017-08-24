@@ -10,6 +10,6 @@
     "key3": ""
   },
   "rootDir": "/var/web",
-  "dbDir": "/tmp",
-  "storageDir": "/Users/auspenskii/test"
+  "dbDir": "/opt/backup/db",
+  "storageDir": "/mnt/backup"
 }
