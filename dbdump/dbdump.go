@@ -16,7 +16,6 @@ import (
 // Set the command line arguments
 var (
 	mysqlUser     = flag.String("u", "test", "Name of your database user.")
-	mysqlPassword = flag.String("p", "test", "Password of your database user.")
 	mysqlHost     = flag.String("h", "localhost", "Name of your Mysql hostname.")
 	mysqlDb       = flag.String("db", "test", "Database name.")
 	allDatabase   = flag.Bool("db-all", false, "If set dump all Mysql databases.")
@@ -55,7 +54,7 @@ func main() {
 	localTmpFile := fmt.Sprintf("%s/%s", *backupDir, filename)
 
 	// Compose mysqldump command
-	mysqldumpCommand := fmt.Sprintf("mysqldump -u%s -p%s -h%s --single-transaction ", *mysqlUser, *mysqlPassword, *mysqlHost)
+	mysqldumpCommand := fmt.Sprintf("mysqldump -u%s -h%s --single-transaction ", *mysqlUser, *mysqlHost)
 	if *allDatabase {
 		mysqldumpCommand += "--all-databases "
 	} else if *mysqlDb != "" {
