@@ -1,13 +1,11 @@
 {
   "testing": {
     "env": "test",
-    "hostname": ".subdomain.domain.ru",
-    "key3": ""
+    "hostname": ".subdomain.domain.ru"
   },
   "production": {
     "env": "production",
-    "hostname": "name.domain.ru",
-    "key3": ""
+    "hostname": "name.domain.ru"
   },
   "rootDir": "/var/web",
   "dbDir": "/opt/backup/db",
