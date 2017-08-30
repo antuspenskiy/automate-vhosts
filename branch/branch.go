@@ -1,22 +1,24 @@
 package branch
 
 import (
-	"fmt"
-	"os/exec"
 	"bytes"
-	"os"
-	"strings"
-	"flag"
-	"regexp"
-	"encoding/json"
-	"io"
 	"compress/gzip"
-	"io/ioutil"
-	"time"
 	"database/sql"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"regexp"
+	"strings"
+	"time"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
+// Configuration represents a stuct for global variables and environments
 type Configuration struct {
 	Test        Testing
 	Prod        Production
@@ -25,18 +27,19 @@ type Configuration struct {
 	StorageDir  string `json:"storageDir"`
 }
 
+// Testing represent a struct for testing environment
 type Testing struct {
 	Env      string `json:"test"`
 	Hostname string `json:"hostname"`
-	Key3     string `json:""`
 }
 
+// Production represent a struct for production environment
 type Production struct {
 	Env      string `json:"production"`
 	Hostname string `json:"hostname"`
-	Key3     string `json:""`
 }
 
+// PassArguments pass branch name
 func PassArguments() string {
 	//c, _ := LoadConfiguration("./config/config.json")
 	//if c.Test.Env == "test" {
@@ -64,6 +67,7 @@ func PassArguments() string {
 	return processedBranchString
 }
 
+// LoadConfiguration load JSON configuration file
 func LoadConfiguration(file string) (Configuration, error) {
 	var config Configuration
 	configFile, err := os.Open(file)
@@ -76,6 +80,7 @@ func LoadConfiguration(file string) (Configuration, error) {
 	return config, err
 }
 
+// ExecCmd run commands
 func ExecCmd(path string, args ...string) {
 	fmt.Printf("Running: %q %q\n", path, strings.Join(args, " "))
 	cmd := exec.Command(path, args...)
@@ -84,6 +89,7 @@ func ExecCmd(path string, args ...string) {
 	fmt.Printf("Error: %v\n\n", err)
 }
 
+// PathExist check if path exists
 func PathExist(_path string) bool {
 	_, err := os.Stat(_path)
 	if err != nil && os.IsNotExist(err) {
@@ -92,6 +98,7 @@ func PathExist(_path string) bool {
 	return true
 }
 
+// PipeLine run pipline commands
 func PipeLine(cmds ...*exec.Cmd) (pipeLineOutput, collectedStandardError []byte, pipeLineError error) {
 	// Require at least one command
 	if len(cmds) < 1 {
@@ -134,6 +141,7 @@ func PipeLine(cmds ...*exec.Cmd) (pipeLineOutput, collectedStandardError []byte,
 	return output.Bytes(), stderr.Bytes(), nil
 }
 
+// UnpackGzipFile extract sql.gz file
 func UnpackGzipFile(gzFilePath, dstFilePath string) (int64, error) {
 	gzFile, err := os.Open(gzFilePath)
 	if err != nil {
@@ -169,6 +177,7 @@ func UnpackGzipFile(gzFilePath, dstFilePath string) (int64, error) {
 	return written, nil
 }
 
+// DeleteFile delete file
 func DeleteFile(path string) {
 	err := os.Remove(path)
 	if err != nil {
@@ -177,6 +186,7 @@ func DeleteFile(path string) {
 	fmt.Printf("Output: File %s deleted. \n", path)
 }
 
+// DatabaseDump dump database via mysqldump, use ./dbdump --help
 func DatabaseDump() {
 	// Set the command line arguments
 	var (
@@ -260,6 +270,7 @@ func DatabaseDump() {
 	fmt.Printf("Output: Dump database %s finished.\n", *mysqlDb)
 }
 
+// DatabaseImport import database dump, use ./dbimport --help
 func DatabaseImport() {
 
 	// Set the command line arguments
