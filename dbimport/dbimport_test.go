@@ -8,8 +8,8 @@ import (
 )
 
 func TestArgs(t *testing.T) {
-	expected := "66-chuck-norris"
-	os.Args = []string{"-branch=66-chuck-norris"}
+	expected := "1testbranch"
+	os.Args = []string{"-branch=1-test-branch"}
 
 	actual := branch.PassArguments()
 

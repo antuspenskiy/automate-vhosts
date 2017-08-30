@@ -1,12 +1,12 @@
 {
   "testing": {
-    "key1": "",
-    "key2": "",
+    "env": "test",
+    "hostname": ".subdomain.domain.ru",
     "key3": ""
   },
   "production": {
-    "key1": "",
-    "key2": "",
+    "env": "production",
+    "hostname": "name.domain.ru",
     "key3": ""
   },
   "rootDir": "/var/web",

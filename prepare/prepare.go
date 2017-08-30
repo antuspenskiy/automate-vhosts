@@ -2,6 +2,5 @@ package main
 
 import "github.com/antuspenskiy/automate-vhosts/branch"
 
-func main() {
-	branch.DatabaseDump()
+func main(){
 }

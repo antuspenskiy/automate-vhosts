@@ -8,35 +8,46 @@ import (
 	"strings"
 	"flag"
 	"regexp"
-	"log"
 	"encoding/json"
 	"io"
 	"compress/gzip"
+	"io/ioutil"
+	"time"
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 type Configuration struct {
-	TestEnv     Testing
-	ProdEnv     Production
+	Test        Testing
+	Prod        Production
 	RootDir     string `json:"rootDir"`
 	DatabaseDir string `json:"dbDir"`
 	StorageDir  string `json:"storageDir"`
 }
 
 type Testing struct {
-	Key1 string `json:""`
-	Key2 string `json:""`
-	Key3 string `json:""`
+	Env      string `json:"test"`
+	Hostname string `json:"hostname"`
+	Key3     string `json:""`
 }
 
 type Production struct {
-	Key1 string `json:""`
-	Key2 string `json:""`
-	Key3 string `json:""`
+	Env      string `json:"production"`
+	Hostname string `json:"hostname"`
+	Key3     string `json:""`
 }
 
 func PassArguments() string {
-	NameBranch := flag.String("branch", "66-chuck-norris", "Branch name")
+	//c, _ := LoadConfiguration("./config/config.json")
+	//if c.Test.Env == "test" {
+	//	dirname := c.RootDir + c.Test.Hostname
+	//} else {
+	//	dirname := c.RootDir + c.Prod.Hostname
+	//}
+
+	NameBranch := flag.String("branch", "1-test-branch", "Branch name")
 	flag.Parse()
+	flag.Args()
 	fmt.Printf("Output: Branch name is %q.", *NameBranch)
 
 	NameBranchToString := *NameBranch
@@ -44,7 +55,7 @@ func PassArguments() string {
 	// Remove all Non-Alphanumeric Characters from a NameBranch
 	reg, err := regexp.Compile("[^a-zA-Z0-9]+")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Printf("Error: %s", err)
 	}
 	processedBranchString := reg.ReplaceAllString(NameBranchToString, "")
 
@@ -65,20 +76,20 @@ func LoadConfiguration(file string) (Configuration, error) {
 	return config, err
 }
 
-func PathExist(_path string) bool {
-	_, err := os.Stat(_path)
-	if err != nil && os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
 func ExecCmd(path string, args ...string) {
 	fmt.Printf("Running: %q %q\n", path, strings.Join(args, " "))
 	cmd := exec.Command(path, args...)
 	bs, err := cmd.CombinedOutput()
 	fmt.Printf("Output: %s\n", bs)
 	fmt.Printf("Error: %v\n\n", err)
+}
+
+func PathExist(_path string) bool {
+	_, err := os.Stat(_path)
+	if err != nil && os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
 
 func PipeLine(cmds ...*exec.Cmd) (pipeLineOutput, collectedStandardError []byte, pipeLineError error) {
@@ -163,5 +174,213 @@ func DeleteFile(path string) {
 	if err != nil {
 		fmt.Printf("Error: %v\n\n", err)
 	}
-	fmt.Printf("Output: Deleted %s\n", path)
+	fmt.Printf("Output: File %s deleted. \n", path)
+}
+
+func DatabaseDump() {
+	// Set the command line arguments
+	var (
+		mysqlUser   = flag.String("u", "test", "Name of your database user.")
+		mysqlHost   = flag.String("h", "localhost", "Name of your Mysql hostname.")
+		mysqlDb     = flag.String("db", "test", "Database name.")
+		allDatabase = flag.Bool("db-all", false, "If set dump all Mysql databases.")
+		backupDir   = flag.String("backup-dir", "/opt/backup/db", "Backup directory for dumps.")
+		storageDir  = flag.String("storage-dir", "/mnt/backup", "Remote storage directory for dumps.")
+		gzipEnable  = flag.Bool("gzip", true, "If set gzip compression enabled.")
+	)
+
+	// Get command line arguments
+	flag.Parse()
+	flag.Args()
+
+	// Get the hostname
+	hostname, err := os.Hostname()
+
+	filename := ""
+	current := time.Now()
+	now := fmt.Sprintf(current.Format("20060102.150405"))
+
+	// Set Filename
+	if *allDatabase {
+		fmt.Printf("Output: Dumping %s databases's start...\n", hostname)
+		filename = fmt.Sprintf("%s_%s.sql", hostname, now)
+	} else {
+		fmt.Printf("Output: Dumping database %s start...\n", *mysqlDb)
+		filename = fmt.Sprintf("%s_%s.sql", *mysqlDb, now)
+	}
+
+	if *gzipEnable {
+		filename += ".gz"
+	}
+
+	// Define local tmp file
+	localTmpFile := fmt.Sprintf("%s/%s", *backupDir, filename)
+
+	// Compose mysqldump command
+	mysqldumpCommand := fmt.Sprintf("mysqldump -u%s -h%s --single-transaction ", *mysqlUser, *mysqlHost)
+	if *allDatabase {
+		mysqldumpCommand += "--all-databases "
+	} else if *mysqlDb != "" {
+		mysqldumpCommand += *mysqlDb
+	} else {
+		fmt.Println("You must specify a database name")
+	}
+
+	// TODO: Refactor to ExecCmd func or similar
+	// Create database dump and store it on local tmp file
+	cmd := exec.Command("/bin/bash", "-c", mysqldumpCommand)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err = cmd.Run()
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
+
+	// Create a gzip file of the dbdump output stream
+	if *gzipEnable {
+		var outGzip bytes.Buffer
+		w := gzip.NewWriter(&outGzip)
+		w.Write(out.Bytes())
+		w.Close()
+
+		out = outGzip
+	}
+
+	// Write the gzip stream to a tmp file
+	ioutil.WriteFile(localTmpFile, out.Bytes(), 0666)
+	fmt.Printf("Output: Gzip file %s created\n", localTmpFile)
+
+	// TODO: Better to use semicolon for rm {} \;
+	// Rotate dumps then synchronize it via rsync
+	ExecCmd("bash", "-c", fmt.Sprintf("find %s/ -name '*.sql.gz' -type f -mtime +14 -exec rm {} +", *backupDir))
+
+	// Synchronize backup directory with storage directory
+	ExecCmd("bash", "-c", fmt.Sprintf("rsync -avpze --progress --stats --delete %s/ %s/", *backupDir, *storageDir))
+
+	fmt.Printf("Output: Dump database %s finished.\n", *mysqlDb)
+}
+
+func DatabaseImport() {
+
+	// Set the command line arguments
+	var (
+		mysqlUser     = flag.String("user", "", "Name of your database user.")
+		mysqlPassword = flag.String("password", "", "Name of your database user password.")
+		mysqlHostname = flag.String("hostname", "localhost", "Name of your database hostname.")
+		mysqlPort     = flag.String("port", "3306", "Name of your database port.")
+		mysqlDatabase = flag.String("database", "", "Name of your database.")
+	)
+
+	c, _ := LoadConfiguration("./config/config.json")
+
+	// Pretty JSON configuration
+	b, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	os.Stdout.Write(b)
+	fmt.Printf("\n\n")
+
+	// Main variables
+	dbName := fmt.Sprintf("i_%s", PassArguments())
+
+	// Use Format for extracted file, so they don't conflicted
+	current := time.Now()
+	dumpFileFormat := fmt.Sprintf(current.Format("20060102.150405"))
+	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", c.DatabaseDir, dumpFileFormat)
+
+	if PathExist(c.StorageDir) {
+		os.Chdir(c.StorageDir)
+
+		// Pipeline commands
+		ls := exec.Command("find", ".", "-name", "*.sql.gz")
+		tail := exec.Command("tail", "-1")
+
+		// Run the pipeline
+		output, stderr, err := PipeLine(ls, tail)
+
+		if err != nil {
+			fmt.Printf("Error: %s", err)
+		}
+
+		// Print the stdout, if any
+		//if len(output) > 0 {
+		//	fmt.Printf("Output: %s\n", output)
+		//}
+
+		// Print the stderr, if any
+		if len(stderr) > 0 {
+			fmt.Printf("%q: (stderr)\n", stderr)
+		}
+
+		// Convert byte output to string
+		dumpFileStr := string(output[:])
+		dumpFileSrc := strings.TrimSpace(dumpFileStr)
+
+		// Copy last database dbdump to dbDir
+		ExecCmd("rsync", "-P", "-t", dumpFileSrc, c.DatabaseDir)
+
+		os.Chdir(c.DatabaseDir)
+
+		// Extract database dbdump, use time() for each extracted file *.sql
+		UnpackGzipFile(dumpFileSrc, dumpFileDst)
+
+		// Prepare database
+		// [user[:pass]@][protocol[(addr)]]/dbname[?p1=v1&...]
+		mysqlInfo := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
+			*mysqlUser, *mysqlPassword, *mysqlHostname, *mysqlPort, *mysqlDatabase)
+
+		db, err := sql.Open("mysql", mysqlInfo)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		defer db.Close()
+
+		// make sure connection is available
+		err = db.Ping()
+		if err != nil {
+			fmt.Println(err.Error())
+		} else {
+			fmt.Printf("Successfully connected to MySQL!\n\n")
+		}
+
+		drop, err := db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s;", dbName))
+		if err != nil {
+			fmt.Println("Query error:", err.Error())
+		} else {
+			count, _ := drop.RowsAffected()
+			fmt.Printf("MySQL: Running: DROP DATABASE IF EXISTS %s;\n", dbName)
+			fmt.Printf("MySQL: Query OK, %d rows affected\n\n", count)
+		}
+
+		create, err := db.Exec(fmt.Sprintf("CREATE DATABASE %s CHARACTER SET utf8 collate utf8_unicode_ci;", dbName))
+		if err != nil {
+			fmt.Println("Query error:", err.Error())
+		} else {
+			count, _ := create.RowsAffected()
+			fmt.Printf("MySQL: Running: CREATE DATABASE %s CHARACTER SET utf8 collate utf8_unicode_ci;\n", dbName)
+			fmt.Printf("MySQL: Query OK, %d rows affected\n\n", count)
+		}
+
+		grant, err := db.Exec(fmt.Sprintf("GRANT ALL PRIVILEGES ON %s.* TO '%s'@'localhost' IDENTIFIED BY '%s';", dbName, dbName, dbName))
+		if err != nil {
+			fmt.Println("Query error:", err.Error())
+		} else {
+			count, _ := grant.RowsAffected()
+			fmt.Printf("MySQL: Running: GRANT ALL PRIVILEGES ON %s.* TO '%s'@'localhost' IDENTIFIED BY '%s';\n", dbName, dbName, dbName)
+			fmt.Printf("MySQL: Query OK, %d rows affected\n\n", count)
+		}
+
+		// Import database dbdump
+		ExecCmd("bash", "-c", fmt.Sprintf("time mysql -u%s %s < %s", *mysqlUser, dbName, dumpFileDst))
+
+		// Delete database dbdump's
+		DeleteFile(dumpFileSrc)
+		DeleteFile(dumpFileDst)
+
+	} else {
+		fmt.Printf("Error: No such file or directory %v\n", c.StorageDir)
+		os.Exit(1)
+	}
+
 }
