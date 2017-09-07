@@ -14,6 +14,11 @@
 - Use `config.json` for environment variables.
 - Clear copied dump and extracted files when import succefull.
 
+### Prepare virtual hosts
+
+- Build project for virtual host
+- Parse settings for virtual host using Gitlab variables
+
 ### Gitlab Schedules Pipeline
 
 - Setting Gitlab Schedules for compiled file and CI to run them.
@@ -41,20 +46,6 @@ Usage of ./dbdump:
 ## Import database dump (dbimport)
 
 ```bash
-{
-  "Test": {
-    "test": "",
-    "hostname": "",
-  },
-  "Prod": {
-    "production": "",
-    "hostname": "",
-  },
-  "rootDir": "/var/web",
-  "dbDir": "/opt/backup/db",
-  "storageDir": "/mnt/backup"
-}
-
 Usage of ./dbimport:
   -branch string
     Branch name (default "1-test-branch")
@@ -68,4 +59,16 @@ Usage of ./dbimport:
     Name of your database port. (default "3306")
   -user string
     Name of your database user.
+```
+
+## Prepare virtual hosts (prepare)
+
+```bash
+Usage of ./prepare:
+  -CI_COMMIT_REF_NAME string
+    	The branch or tag name for which project is built.
+  -CI_COMMIT_REF_SLUG string
+    	Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.
+  -CI_COMMIT_SHA string
+    	The commit revision for which project is built.
 ```
