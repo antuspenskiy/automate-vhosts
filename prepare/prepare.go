@@ -1,6 +1,10 @@
 package main
 
-import "github.com/antuspenskiy/automate-vhosts/branch"
+import (
+	"github.com/antuspenskiy/automate-vhosts/branch"
+)
 
-func main(){
+func main() {
+	// Execute func Prepare from branch/branch.go
+	branch.Prepare()
 }

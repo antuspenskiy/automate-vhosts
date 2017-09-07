@@ -1,13 +1,15 @@
 {
   "testing": {
     "env": "test",
-    "hostname": ".subdomain.domain.ru"
+    "settings": "/public/.settings.php",
+    "dbconn": "/public/php_interface/dbconn.php",
+    "parse": "/opt/scripts/parse.php"
   },
   "production": {
     "env": "production",
     "hostname": "name.domain.ru"
   },
-  "rootDir": "/var/web",
+  "rootDir": "/var/web/",
   "dbDir": "/opt/backup/db",
   "storageDir": "/mnt/backup"
 }

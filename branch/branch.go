@@ -14,39 +14,40 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"log"
+	"syscall"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-// Configuration represents a stuct for global variables and environments
+// Configuration represents a struct for global variables and environments
 type Configuration struct {
-	Test        Testing
-	Prod        Production
+	Testing struct {
+		Env           string `json:"env"`
+		SettingsFile  string `json:"settings"`
+		DBConnFile    string `json:"dbconn"`
+		ParseSettings string `json:"parse"`
+	} `json:"testing"`
+	Production struct {
+		Env      string `json:"env"`
+		Hostname string `json:"hostname"`
+	} `json:"production"`
 	RootDir     string `json:"rootDir"`
 	DatabaseDir string `json:"dbDir"`
 	StorageDir  string `json:"storageDir"`
 }
 
-// Testing represent a struct for testing environment
-type Testing struct {
-	Env      string `json:"test"`
-	Hostname string `json:"hostname"`
-}
+const (
+	defaultFailedCode = 1
+)
 
-// Production represent a struct for production environment
-type Production struct {
-	Env      string `json:"production"`
-	Hostname string `json:"hostname"`
-}
+var (
+	gitUrl    = "git@your_git_url"
+	configDir = "/opt/scripts/config/config.json"
+)
 
 // PassArguments pass branch name
 func PassArguments() string {
-	//c, _ := LoadConfiguration("./config/config.json")
-	//if c.Test.Env == "test" {
-	//	dirname := c.RootDir + c.Test.Hostname
-	//} else {
-	//	dirname := c.RootDir + c.Prod.Hostname
-	//}
 
 	NameBranch := flag.String("branch", "1-test-branch", "Branch name")
 	flag.Parse()
@@ -60,7 +61,7 @@ func PassArguments() string {
 	if err != nil {
 		fmt.Printf("Error: %s", err)
 	}
-	processedBranchString := reg.ReplaceAllString(NameBranchToString, "")
+	processedBranchString := reg.ReplaceAllString(NameBranchToString, "_")
 
 	fmt.Printf("A Branch name of %s becomes %s. \n\n", NameBranchToString, processedBranchString)
 
@@ -81,18 +82,66 @@ func LoadConfiguration(file string) (Configuration, error) {
 }
 
 // ExecCmd run commands
-func ExecCmd(path string, args ...string) {
-	fmt.Printf("Running: %q %q\n", path, strings.Join(args, " "))
-	cmd := exec.Command(path, args...)
-	bs, err := cmd.CombinedOutput()
-	fmt.Printf("Output: %s\n", bs)
-	fmt.Printf("Error: %v\n\n", err)
+//func ExecCmd(path string, args ...string) {
+//	fmt.Printf("Running: %q %q\n", path, strings.Join(args, " "))
+//	cmd := exec.Command(path, args...)
+//	output, err := cmd.CombinedOutput()
+//	if err != nil {
+//		fmt.Printf(fmt.Sprint(err) + ": " + string(output))
+//		return
+//	} else {
+//		fmt.Println(string(output))
+//
+//		//bs, err := cmd.CombinedOutput()
+//		//
+//		//fmt.Printf("Output: %s\n", bs)
+//		//fmt.Printf("Error: %v\n\n", err)
+//	}
+//}
+
+// RunCommand exec command and print stdout,stderr and exitCode
+func RunCommand(name string, args ...string) (stdout string, stderr string, exitCode int) {
+	log.Println("run command:", name, args)
+	var outbuf, errbuf bytes.Buffer
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = &outbuf
+	cmd.Stderr = &errbuf
+
+	err := cmd.Run()
+	stdout = outbuf.String()
+	stderr = errbuf.String()
+
+	if err != nil {
+		// try to get the exit code
+		if exitError, ok := err.(*exec.ExitError); ok {
+			ws := exitError.Sys().(syscall.WaitStatus)
+			exitCode = ws.ExitStatus()
+		} else {
+			// This will happen (in OSX) if `name` is not available in $PATH,
+			// in this situation, exit code could not be get, and stderr will be
+			// empty string very likely, so we use the default fail code, and format err
+			// to string and set to stderr
+			log.Printf("Could not get exit code for failed program: %v, %v", name, args)
+			exitCode = defaultFailedCode
+			if stderr == "" {
+				stderr = err.Error()
+			}
+		}
+	} else {
+		// success, exitCode should be 0 if go is ok
+		ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
+		exitCode = ws.ExitStatus()
+	}
+	if exitCode != 0 {
+		log.Fatalf("command result, stdout: %v, stderr: %v, exitCode: %v", stdout, stderr, exitCode)
+	}
+	log.Printf("command result, stdout: %v, stderr: %v, exitCode: %v", stdout, stderr, exitCode)
+	return
 }
 
-// PathExist check if path exists
-func PathExist(_path string) bool {
-	_, err := os.Stat(_path)
-	if err != nil && os.IsNotExist(err) {
+// DirectoryExists returns true if a directory(or file) exists, otherwise false
+func DirectoryExists(dir string) bool {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return false
 	}
 	return true
@@ -262,10 +311,10 @@ func DatabaseDump() {
 
 	// TODO: Better to use semicolon for rm {} \;
 	// Rotate dumps then synchronize it via rsync
-	ExecCmd("bash", "-c", fmt.Sprintf("find %s/ -name '*.sql.gz' -type f -mtime +14 -exec rm {} +", *backupDir))
+	RunCommand("bash", "-c", fmt.Sprintf("find %s/ -name '*.sql.gz' -type f -mtime +14 -exec rm {} +", *backupDir))
 
 	// Synchronize backup directory with storage directory
-	ExecCmd("bash", "-c", fmt.Sprintf("rsync -avpze --progress --stats --delete %s/ %s/", *backupDir, *storageDir))
+	RunCommand("bash", "-c", fmt.Sprintf("rsync -avpze --progress --stats --delete %s/ %s/", *backupDir, *storageDir))
 
 	fmt.Printf("Output: Dump database %s finished.\n", *mysqlDb)
 }
@@ -282,25 +331,25 @@ func DatabaseImport() {
 		mysqlDatabase = flag.String("database", "", "Name of your database.")
 	)
 
-	c, _ := LoadConfiguration("./config/config.json")
+	c, _ := LoadConfiguration(configDir)
 
 	// Pretty JSON configuration
-	b, err := json.MarshalIndent(c, "", "  ")
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-	os.Stdout.Write(b)
-	fmt.Printf("\n\n")
+	//b, err := json.MarshalIndent(c, "", "  ")
+	//if err != nil {
+	//	fmt.Println("Error:", err)
+	//}
+	//os.Stdout.Write(b)
+	//fmt.Printf("\n\n")
 
 	// Main variables
-	dbName := fmt.Sprintf("i_%s", PassArguments())
+	dbName := fmt.Sprintf("%s", PassArguments())
 
 	// Use Format for extracted file, so they don't conflicted
 	current := time.Now()
 	dumpFileFormat := fmt.Sprintf(current.Format("20060102.150405"))
 	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", c.DatabaseDir, dumpFileFormat)
 
-	if PathExist(c.StorageDir) {
+	if DirectoryExists(c.StorageDir) {
 		os.Chdir(c.StorageDir)
 
 		// Pipeline commands
@@ -329,7 +378,7 @@ func DatabaseImport() {
 		dumpFileSrc := strings.TrimSpace(dumpFileStr)
 
 		// Copy last database dbdump to dbDir
-		ExecCmd("rsync", "-P", "-t", dumpFileSrc, c.DatabaseDir)
+		RunCommand("rsync", "-P", "-t", dumpFileSrc, c.DatabaseDir)
 
 		os.Chdir(c.DatabaseDir)
 
@@ -352,7 +401,7 @@ func DatabaseImport() {
 		if err != nil {
 			fmt.Println(err.Error())
 		} else {
-			fmt.Printf("Successfully connected to MySQL!\n\n")
+			fmt.Printf("\n\nSuccessfully connected to MySQL!\n\n")
 		}
 
 		drop, err := db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s;", dbName))
@@ -383,7 +432,7 @@ func DatabaseImport() {
 		}
 
 		// Import database dbdump
-		ExecCmd("bash", "-c", fmt.Sprintf("time mysql -u%s %s < %s", *mysqlUser, dbName, dumpFileDst))
+		RunCommand("bash", "-c", fmt.Sprintf("time mysql -u%s %s < %s", *mysqlUser, dbName, dumpFileDst))
 
 		// Delete database dbdump's
 		DeleteFile(dumpFileSrc)
@@ -394,4 +443,60 @@ func DatabaseImport() {
 		os.Exit(1)
 	}
 
+}
+
+func Prepare() {
+	// Set the command line arguments
+	var (
+		refSlug   = flag.String("CI_COMMIT_REF_SLUG", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
+		refName   = flag.String("CI_COMMIT_REF_NAME", "", "The branch or tag name for which project is built.")
+		commitSha = flag.String("CI_COMMIT_SHA", "", "The commit revision for which project is built.")
+	)
+
+	c, _ := LoadConfiguration(configDir)
+
+	// Get command line arguments
+	flag.Parse()
+	flag.Args()
+
+	hostDir := c.RootDir + *refSlug
+	settings := hostDir + c.Testing.SettingsFile
+	dbconn := hostDir + c.Testing.DBConnFile
+
+	if DirectoryExists(hostDir) {
+
+		fmt.Printf("Directory %s exists.\n\n", hostDir)
+
+		os.Chdir(hostDir)
+		RunCommand("bash", "-c", fmt.Sprintf("git fetch --prune origin"))
+		RunCommand("bash", "-c", fmt.Sprintf("git reset --hard HEAD"))
+
+	} else {
+
+		fmt.Printf("Create directory %s.\n\n", hostDir)
+		os.Mkdir(fmt.Sprintf("%s", hostDir), 0750)
+		os.Chdir(hostDir)
+
+		RunCommand("bash", "-c", fmt.Sprintf("git init"))
+		RunCommand("bash", "-c", fmt.Sprintf("git remote add -t %s -f origin %s", *refSlug, gitUrl))
+		RunCommand("bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
+		RunCommand("bash", "-c", fmt.Sprintf("composer install --no-dev --no-progress"))
+		RunCommand("bash", "-c", fmt.Sprintf("yarn clean"))
+		RunCommand("bash", "-c", fmt.Sprintf("yarn install --no-progress"))
+		RunCommand("bash", "-c", fmt.Sprintf("./node_modules/.bin/bower install"))
+		RunCommand("bash", "-c", fmt.Sprintf("./node_modules/.bin/bower prune"))
+		RunCommand("bash", "-c", fmt.Sprintf("yarn build"))
+	}
+
+	if DirectoryExists(settings) || DirectoryExists(dbconn) {
+	} else {
+
+		fmt.Println("Run parse settings...")
+
+		RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", settings, settings))
+		RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", dbconn, dbconn))
+		RunCommand("bash", "-c", fmt.Sprintf("php -f %s %s %s %s", c.Testing.ParseSettings, hostDir, *refName, *refName))
+
+		fmt.Println("Parse complete.")
+	}
 }
