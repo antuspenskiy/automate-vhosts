@@ -1,0 +1,21 @@
+{
+  "testing": {
+    "env": "test",
+    "hostname": "hostname",
+    "settings": "settings file for parse",
+    "dbconn": "dbconn file for parse",
+    "parse": "parse script",
+    "pool": "php-fpm.d directory",
+    "pm2": "pm2 directory for json files",
+    "nginx": "nginx directory",
+    "template":"./template/nginx.tmpl"
+  },
+  "production": {
+    "env": "production",
+    "hostname": "name.domain.ru"
+  },
+  "rootDir": "/var/web/",
+  "dbDir": "/opt/backup/db",
+  "storageDir": "/mnt/backup",
+  "gitUrl": "gitUrl"
+}

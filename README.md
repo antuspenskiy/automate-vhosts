@@ -16,8 +16,15 @@
 
 ### Prepare virtual hosts
 
-- Build project for virtual host
-- Parse settings for virtual host using Gitlab variables
+- Build project for virtual host.
+- Parse settings for virtual host using Gitlab variables.
+
+### Create configuration files for virtual hosts
+
+- Create nginx,php-fpm and pm2 configuration files.
+- Restart nginx, php-fpm when create configuration files.
+- Start pm2 process from configuration file.
+- Reload pm2 process if .json file exists, run commands for checkout and build if virtual host directory exists.
 
 ### Gitlab Schedules Pipeline
 
@@ -71,4 +78,12 @@ Usage of ./prepare:
     	Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.
   -CI_COMMIT_SHA string
     	The commit revision for which project is built.
+```
+
+## Create configuration files for virtual hosts (createconfigs)
+
+```bash
+Usage of ./createconfigs:
+  -CI_COMMIT_REF_SLUG string
+    	Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.
 ```
