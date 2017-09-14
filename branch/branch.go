@@ -93,7 +93,6 @@ func PassArguments() string {
 
 	NameBranch := flag.String("branch", "1-test-branch", "Branch name")
 	flag.Parse()
-	flag.Args()
 	log.Printf("Branch name is %q.", *NameBranch)
 
 	NameBranchToString := *NameBranch
@@ -336,7 +335,6 @@ func DatabaseDump() {
 
 	// Get command line arguments
 	flag.Parse()
-	flag.Args()
 
 	// Get the hostname
 	hostname, err := os.Hostname()
@@ -543,7 +541,6 @@ func Prepare() {
 
 	// Get command line arguments
 	flag.Parse()
-	flag.Args()
 
 	hostDir := c.RootDir + *refSlug
 	settings := hostDir + c.Testing.SettingsFile
@@ -605,7 +602,6 @@ func CreateConfigs() {
 
 	// Get command line arguments
 	flag.Parse()
-	flag.Args()
 
 	hostDir := c.RootDir + *refSlug
 	pm2Dir := c.RootDir + c.Testing.PmDir
@@ -703,4 +699,36 @@ func CreateConfigs() {
 			log.Printf("%s\n", string(data))
 		}
 	}
+}
+
+func DeleteStuff() {
+
+	// Set the command line arguments
+	var (
+		refSlug = flag.String("CI_COMMIT_REF_SLUG", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
+	)
+
+	c, _ := LoadConfiguration(configDir)
+
+	// Get command line arguments
+	flag.Parse()
+
+	hostDir := c.RootDir + *refSlug
+	pm2Dir := c.RootDir + c.Testing.PmDir
+
+	// Remove virtual host directory
+	RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s", hostDir))
+
+	// Remove nginx configuration file for virtual host
+	RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", c.Testing.NginxSettings, *refSlug))
+
+	// Remove php-fpm configuration file for virtual host
+	RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", c.Testing.PoolSettings, *refSlug))
+
+	// Remove pm2 process and configuration file for virtual host
+	RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 delete %s", *refSlug))
+	RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.json", pm2Dir, *refSlug))
+
+	// Restart nginx and php-fpm
+	RunCommand("bash", "-c", "systemctl restart nginx php-fpm")
 }
