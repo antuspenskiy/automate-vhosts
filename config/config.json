@@ -1,9 +1,14 @@
 {
   "testing": {
     "env": "test",
-    "settings": "/public/.settings.php",
-    "dbconn": "/public/php_interface/dbconn.php",
-    "parse": "/opt/scripts/parse.php"
+    "hostname": "test-intranet.phoenixit.ru",
+    "settings": "/public/bitrix/.settings.php",
+    "dbconn": "/public/bitrix/php_interface/dbconn.php",
+    "parse": "/opt/scripts/parse.php",
+    "pool": "/etc/php-fpm.d",
+    "pm2": "pm2json",
+    "nginx": "/etc/nginx/conf.d",
+    "template":"/opt/scripts/template/nginx.tmpl"
   },
   "production": {
     "env": "production",
@@ -11,5 +16,6 @@
   },
   "rootDir": "/var/web/",
   "dbDir": "/opt/backup/db",
-  "storageDir": "/mnt/backup"
+  "storageDir": "/mnt/backup",
+  "gitUrl": "git@gitlab.akb-it.ru:dba/intranet.git"
 }
