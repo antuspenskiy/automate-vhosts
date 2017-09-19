@@ -36,7 +36,7 @@ server {
     	}
 
 	location @bitrix {
-          fastcgi_pass 127.0.0.1:{{.Port}};
+          fastcgi_pass 127.0.0.1:{{.PortPhp}};
           fastcgi_read_timeout 60m;
           include fastcgi_params;
           fastcgi_split_path_info ^(.+?\.php)(/.*)$;
@@ -45,7 +45,7 @@ server {
     }
 
     location /nodejs {
-        proxy_pass http://127.0.0.1:{{.Port}};
+        proxy_pass http://127.0.0.1:{{.PortNode}};
     }
 
     location ~ \.php {
@@ -53,7 +53,7 @@ server {
           error_page 418 = @bitrix;
           return 418;
     }
-      fastcgi_pass 127.0.0.1:{{.Port}};
+      fastcgi_pass 127.0.0.1:{{.PortPhp}};
       fastcgi_read_timeout 60m;
       include fastcgi_params;
       fastcgi_split_path_info ^(.+?\.php)(/.*)$;
