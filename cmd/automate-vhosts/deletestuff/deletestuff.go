@@ -90,15 +90,6 @@ func main() {
 		log.Printf("MySQL: Query OK, %d rows affected\n\n", count)
 	}
 
-	dropprivs, err := db.Exec(fmt.Sprintf("REVOKE ALL PRIVILEGES ON %s.* FROM '%s'@'localhost';", dbName, dbName))
-	if err != nil {
-		log.Fatalf(err.Error())
-	} else {
-		count, _ := dropprivs.RowsAffected()
-		log.Printf("MySQL: Running: REVOKE ALL PRIVILEGES ON %s.* FROM '%s'@'localhost';\n", dbName, dbName)
-		log.Printf("MySQL: Query OK, %d rows affected\n\n", count)
-	}
-
 	// Restart nginx and php-fpm
 	branch.RunCommand("bash", "-c", "systemctl restart nginx php-fpm")
 }
