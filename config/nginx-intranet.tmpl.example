@@ -7,8 +7,8 @@ server {
     root $project_dir/public;
     index index.php;
 
-    ssl_certificate /etc/nginx/ssl/your_certificate.crt;
-    ssl_certificate_key /etc/nginx/ssl/your_key.key;
+    ssl_certificate /path/to/certificates/file.crt;
+    ssl_certificate_key /path/to/certificates/file.key;
     ssl_ciphers "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH";
     ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
     ssl_prefer_server_ciphers   on;

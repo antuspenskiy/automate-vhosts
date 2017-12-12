@@ -8,14 +8,15 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/antuspenskiy/automate-vhosts/pkg/branch"
 )
 
 var (
-	Version     = "undefined"
-	BuildTime   = "undefined"
-	GitHash     = "undefined"
+	Version   = "undefined"
+	BuildTime = "undefined"
+	GitHash   = "undefined"
 )
 
 func main() {
@@ -25,100 +26,115 @@ func main() {
 
 	// Set the command line arguments
 	var (
-		configDir = "/opt/scripts/configs/config.json"
-		refSlug   = flag.String("CI_COMMIT_REF_SLUG", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
-		refName   = flag.String("CI_COMMIT_REF_NAME", "", "The branch or tag name for which project is built.")
-		commitSha = flag.String("CI_COMMIT_SHA", "", "The commit revision for which project is built.")
+		refSlug   = flag.String("refslug", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
+		commitSha = flag.String("commitsha", "", "The commit revision for which project is built.")
 	)
-
-	c, _ := branch.LoadConfiguration(configDir)
 
 	// Get command line arguments
 	flag.Parse()
 
-	hostDir := c.RootDir + *refSlug
-	settings := hostDir + c.Testing.SettingsFile
-	dbconn := hostDir + c.Testing.DBConnFile
-	dbName := fmt.Sprintf("%s", branch.PassArguments(*refSlug))
+	// Load json configuration
+	conf, err := branch.ReadConfig("env")
+	if err != nil {
+		panic(fmt.Errorf("Error when reading config: %v\n", err))
+	}
+
+	// Get server hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+
+	// Variables
+	hostDir := conf.GetString("rootdir") + *refSlug
+	bxConf := hostDir + conf.GetString("server.settings")
+	bxConn := hostDir + conf.GetString("server.dbconn")
+	dbName := branch.ParseBranchName(*refSlug)
 
 	if branch.DirectoryExists(hostDir) {
 
 		log.Printf("Directory %s exists.\n\n", hostDir)
 		os.Chdir(hostDir)
 
-		branch.RunCommand("bash", "-c", fmt.Sprintf("git fetch --prune origin"))
+		branch.RunCommand("bash", "-c", "git fetch --prune origin")
 		branch.RunCommand("bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("composer install --no-dev --no-progress"))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("yarn clean"))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("yarn install --no-progress"))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("./node_modules/.bin/bower install"))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("./node_modules/.bin/bower prune"))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("yarn build"))
+
+		branch.Deploy(conf.GetString("server.cmd-dir-exist"))
 
 	} else {
-
 		log.Printf("Create directory %s.\n\n", hostDir)
-		os.Mkdir(fmt.Sprintf("%s", hostDir), 0750)
+		os.Mkdir(hostDir, 0750)
 		os.Chdir(hostDir)
 
-		// Create library configuration file
-
-		var buf bytes.Buffer
-		post := &branch.LibPost{
-			branch.LibConfiguration{
-				branch.BaseConfig{
-					dbName,
-					dbName,
-					dbName,
-					"localhost",
+		// Create library configuration file for intranet-test, need before func Deploy()
+		if strings.Contains(hostname, "intranet") {
+			var buf bytes.Buffer
+			post := &branch.LibPost{
+				P: branch.LibConfiguration{
+					BaseConfig: branch.BaseConfig{
+						BaseName: dbName,
+						UserName: dbName,
+						Password: dbName,
+						Host:     "localhost",
+					},
+					ExternalServerApi: "https://127.0.0.1",
 				},
-				"https://127.0.0.1",
-			},
-			branch.LibConfiguration{
-				branch.BaseConfig{
-					dbName,
-					dbName,
-					dbName,
-					"localhost",
+				D: branch.LibConfiguration{
+					BaseConfig: branch.BaseConfig{
+						BaseName: dbName,
+						UserName: dbName,
+						Password: dbName,
+						Host:     "localhost",
+					},
+					ExternalServerApi: "https://127.0.0.1",
 				},
-				"https://127.0.0.1",
-			},
-		}
-		branch.EncodeTo(&buf, post)
+			}
+			branch.EncodeTo(&buf, post)
 
-		// Pretty print json file
-		data, err := json.MarshalIndent(post, "", " ")
-		if err != nil {
-			log.Fatalln("MarshalIndent:", err)
-		}
-		log.Printf("library json configuration created:\n%s", data)
+			// Pretty print json file
+			data, err := json.MarshalIndent(post, "", " ")
+			if err != nil {
+				log.Fatalln("MarshalIndent:", err)
+			}
+			log.Printf("Library JSON configuration created:\n%s", data)
 
-		if fmt.Sprintf("%s/env.json", hostDir) != "" {
-			if err = ioutil.WriteFile(fmt.Sprintf("%s/env.json", hostDir), data, 0644); err != nil {
-				log.Fatalln("WriteFile:", err)
+			if fmt.Sprintf("%s/env.json", hostDir) != "" {
+				if err = ioutil.WriteFile(fmt.Sprintf("%s/env.json", hostDir), data, 0644); err != nil {
+					log.Fatalln("WriteFile:", err)
+				}
 			}
 		}
 
-		branch.RunCommand("bash", "-c", fmt.Sprintf("git init"))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("git remote add -t %s -f origin %s", *refSlug, c.GitUrl))
+		// Create environment .env for Laravel applications
+		if strings.Contains(hostname, "ees") {
+			laravelData := branch.LaravelTemplate{
+				AppUrl:     *refSlug,
+				DBDatabase: dbName,
+				DBUserName: dbName,
+				DBPassword: dbName,
+			}
+
+			log.Printf("Create environment file %s/.env\n", hostDir)
+
+			txt := branch.ParseTemplate(conf.GetString("server.envtmpl"), laravelData)
+			branch.WriteStringToFile(fmt.Sprintf("%s/.env", hostDir), txt)
+			log.Printf("Environemnt configuration for %s/.env created\n", hostDir)
+		}
+
+		branch.RunCommand("bash", "-c", "git init")
+		branch.RunCommand("bash", "-c", fmt.Sprintf("git remote add -t %s -f origin %s", *refSlug, conf.GetString("server.giturl")))
 		branch.RunCommand("bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("composer install --no-dev --no-progress"))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("yarn clean"))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("yarn install --no-progress"))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("./node_modules/.bin/bower install"))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("./node_modules/.bin/bower prune"))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("yarn build"))
+
+		branch.Deploy(conf.GetString("server.cmd-dir-not-exist"))
 	}
 
-	if branch.DirectoryExists(settings) || branch.DirectoryExists(dbconn) {
-	} else {
+	if strings.Contains(hostname, "intranet") {
+		if branch.DirectoryExists(bxConf) || branch.DirectoryExists(bxConn) {
+		} else {
 
-		log.Println("Run parse settings...")
-
-		branch.RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", settings, settings))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", dbconn, dbconn))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("php -f %s %s %s %s", c.Testing.ParseSettings, hostDir, *refName, *refName))
-
-		log.Println("Parse complete.")
+			log.Println("Run parse settings...")
+			branch.ParseSettings(bxConf, bxConn, conf.GetString("server.parse"), hostDir, refSlug)
+			log.Println("Parse complete.")
+		}
 	}
 }

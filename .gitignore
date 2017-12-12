@@ -17,3 +17,7 @@
 .idea/
 config/config.json
 template/nginx.tmpl
+
+*.json
+*.tmpl
+.DS_Store
