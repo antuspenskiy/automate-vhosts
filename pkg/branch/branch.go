@@ -17,31 +17,10 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/spf13/viper"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/antuspenskiy/automate-vhosts-copy/pkg/branch"
 )
-
-// Configuration represents a struct for JSON global variables and environments
-type Configuration struct {
-	Testing struct {
-		Env           string `json:"env"`
-		Hostname      string `json:"hostname"`
-		SettingsFile  string `json:"settings"`
-		DBConnFile    string `json:"dbconn"`
-		ParseSettings string `json:"parse"`
-		PoolSettings  string `json:"pool"`
-		PmDir         string `json:"pm2"`
-		NginxSettings string `json:"nginx"`
-		NginxTemplate string `json:"template"`
-	} `json:"testing"`
-	Production struct {
-		Env      string `json:"env"`
-		Hostname string `json:"hostname"`
-	} `json:"production"`
-	RootDir     string `json:"rootDir"`
-	DatabaseDir string `json:"dbDir"`
-	StorageDir  string `json:"storageDir"`
-	GitUrl      string `json:"gitUrl"`
-}
 
 // LibPost represents a struct for Library configuration
 type LibPost struct {
@@ -89,6 +68,13 @@ type NginxTemplate struct {
 	RefSlug    string
 }
 
+type LaravelTemplate struct {
+	AppUrl     string
+	DBDatabase string
+	DBUserName string
+	DBPassword string
+}
+
 const (
 	defaultFailedCode  = 1
 	minTCPPort         = 0
@@ -101,32 +87,36 @@ var (
 	tcpPortRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
-// PassArguments pass branch name
-func PassArguments(name string) string {
+// ParseBranchName parse branch name symbols and lenght
+func ParseBranchName(name string) string {
 
 	// Remove all Non-Alphanumeric Characters from a NameBranch
 	reg, err := regexp.Compile("[^a-zA-Z0-9]+")
 	if err != nil {
 		log.Fatalf("Error: %s", err)
 	}
-	processedBranchString := reg.ReplaceAllString(name, "_")
 
-	log.Printf("A Branch name of %s becomes %s. \n\n", name, processedBranchString)
+	branchString := reg.ReplaceAllString(name, "_")
 
-	return processedBranchString
+	// User name (should be no longer than 32) for Percona Server
+	if len(branchString) > 32 {
+		branchCut := branchString[0:32]
+		fmt.Printf("A string of %s becomes %s \n", name, branchCut)
+		return branchCut
+	} else {
+		fmt.Printf("A string of %s becomes %s \n", name, branchString)
+		return branchString
+	}
 }
 
-// LoadConfiguration load JSON configuration file
-func LoadConfiguration(file string) (Configuration, error) {
-	var config Configuration
-	configFile, err := os.Open(file)
-	defer configFile.Close()
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
-	jsonParser := json.NewDecoder(configFile)
-	jsonParser.Decode(&config)
-	return config, err
+// ReadConfig read json environment file from directory
+func ReadConfig(filename string) (*viper.Viper, error) {
+	v := viper.New()
+	v.SetConfigName(filename)
+	v.AddConfigPath("/opt/scripts/config")
+	v.AutomaticEnv()
+	err := v.ReadInConfig()
+	return v, err
 }
 
 // RunCommand exec command and print stdout,stderr and exitCode
@@ -265,6 +255,24 @@ func DeleteFile(path string) {
 	log.Printf("File %s deleted. \n", path)
 }
 
+// Deploy deploy commands for virtual hosts
+func Deploy(conf string) []string {
+	cmd := conf
+	commands := strings.Split(cmd, ",")
+
+	for _, command := range commands {
+		branch.RunCommand("bash", "-c", command)
+	}
+	return commands
+}
+
+// ParseSettings parse settings for intranet-test virtual hosts
+func ParseSettings(bxconf string, bxconn string, parse string, hostdir string, refslug *string) {
+	RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", bxconf, bxconf))
+	RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", bxconn, bxconn))
+	RunCommand("bash", "-c", fmt.Sprintf("php -f %s %s %s %s", parse, hostdir, *refslug, *refslug))
+}
+
 // IsTCPPortAvailable returns a flag indicating whether or not a TCP port is
 // available.
 func IsTCPPortAvailable(port int) bool {
@@ -304,11 +312,10 @@ func WriteStringToFile(filepath, s string) error {
 		log.Fatalf("Error: %v\n\n", err)
 		return err
 	}
-	log.Printf("nginx configuration %s created\n", filepath)
 	return nil
 }
 
-func ParseTemplate(templateFileName string, data NginxTemplate) string {
+func ParseTemplate(templateFileName string, data interface{}) string {
 	t, err := template.ParseFiles(templateFileName)
 	if err != nil {
 		log.Println(err)

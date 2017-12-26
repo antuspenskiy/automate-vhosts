@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	Version     = "undefined"
-	BuildTime   = "undefined"
-	GitHash     = "undefined"
+	Version   = "undefined"
+	BuildTime = "undefined"
+	GitHash   = "undefined"
 )
 
 func main() {
@@ -26,8 +26,7 @@ func main() {
 
 	// Set the command line arguments
 	var (
-		configDir     = "/opt/scripts/configs/config.json"
-		refSlug       = flag.String("CI_COMMIT_REF_SLUG", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
+		refSlug       = flag.String("refslug", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
 		mysqlUser     = flag.String("user", "", "Name of your database user.")
 		mysqlPassword = flag.String("password", "", "Name of your database user password.")
 		mysqlHostname = flag.String("hostname", "localhost", "Name of your database hostname.")
@@ -38,26 +37,28 @@ func main() {
 	// Get command line arguments
 	flag.Parse()
 
-	c, _ := branch.LoadConfiguration(configDir)
+	// Load json configuration
+	conf, err := branch.ReadConfig("env")
+	if err != nil {
+		panic(fmt.Errorf("Error when reading config: %v\n", err))
+	}
 
-	// Pretty JSON configuration
-	//b, err := json.MarshalIndent(c, "", "  ")
-	//if err != nil {
-	//	fmt.Println("Error:", err)
-	//}
-	//os.Stdout.Write(b)
-	//fmt.Printf("\n\n")
+	// Get server hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
 
 	// Main variables
-	dbName := fmt.Sprintf("%s", branch.PassArguments(*refSlug))
+	dbName := fmt.Sprintf("%s", branch.ParseBranchName(*refSlug))
 
 	// Use Format for extracted file, so they don't conflicted
 	current := time.Now()
 	dumpFileFormat := fmt.Sprintf(current.Format("20060102.150405"))
-	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", c.DatabaseDir, dumpFileFormat)
+	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", conf.GetString("dbdir"), dumpFileFormat)
 
-	if branch.DirectoryExists(c.StorageDir) {
-		os.Chdir(c.StorageDir)
+	if branch.DirectoryExists(conf.GetString("storagedir")) {
+		os.Chdir(conf.GetString("storagedir"))
 
 		// Pipeline commands
 		ls := exec.Command("find", ".", "-name", "*.sql.gz")
@@ -85,9 +86,9 @@ func main() {
 		dumpFileSrc := strings.TrimSpace(dumpFileStr)
 
 		// Copy last database dbdump to dbDir
-		branch.RunCommand("rsync", "-P", "-t", dumpFileSrc, c.DatabaseDir)
+		branch.RunCommand("rsync", "-P", "-t", dumpFileSrc, conf.GetString("dbdir"))
 
-		os.Chdir(c.DatabaseDir)
+		os.Chdir(conf.GetString("dbdir"))
 
 		// Extract database dbdump, use time() for each extracted file *.sql
 		branch.UnpackGzipFile(dumpFileSrc, dumpFileDst)
@@ -138,15 +139,25 @@ func main() {
 			log.Printf("MySQL: Query OK, %d rows affected\n\n", count)
 		}
 
-		// Import database dbdump
+		// Import database dump
 		branch.RunCommand("bash", "-c", fmt.Sprintf("time mysql -u%s %s < %s", *mysqlUser, dbName, dumpFileDst))
 
+		if strings.Contains(hostname, "ees") {
+			update, err := db.Exec(fmt.Sprintf("UPDATE %s.user_data SET salary = 10000, salary_proposed = 11000;", dbName))
+			if err != nil {
+				log.Fatalf(err.Error())
+			} else {
+				count, _ := update.RowsAffected()
+				log.Printf("MySQL: Running: UPDATE user_data SET salary = 10000, salary_proposed = 11000;\n")
+				log.Printf("MySQL: Query OK, %d rows affected\n\n", count)
+			}
+		}
+
 		// Delete database dbdump's
-		branch.DeleteFile(dumpFileSrc)
-		branch.DeleteFile(dumpFileDst)
+		branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/*.sql*", conf.GetString("dbdir")))
 
 	} else {
-		log.Fatalf("Error: No such file or directory %v\n", c.StorageDir)
+		log.Fatalf("Error: No such file or directory %v\n", conf.GetString("storagedir"))
 	}
 
 }

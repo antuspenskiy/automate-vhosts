@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"database/sql"
 	"log"
+	"strings"
+	"os"
 
 	"github.com/antuspenskiy/automate-vhosts/pkg/branch"
 )
 
 var (
-	Version     = "undefined"
-	BuildTime   = "undefined"
-	GitHash     = "undefined"
+	Version   = "undefined"
+	BuildTime = "undefined"
+	GitHash   = "undefined"
 )
 
 func main() {
@@ -22,8 +24,7 @@ func main() {
 
 	// Set the command line arguments
 	var (
-		configDir     = "/opt/scripts/configs/config.json"
-		refSlug       = flag.String("CI_COMMIT_REF_SLUG", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
+		refSlug       = flag.String("refslug", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
 		mysqlUser     = flag.String("user", "", "Name of your database user.")
 		mysqlPassword = flag.String("password", "", "Name of your database user password.")
 		mysqlHostname = flag.String("hostname", "localhost", "Name of your database hostname.")
@@ -31,27 +32,25 @@ func main() {
 		mysqlDatabase = flag.String("database", "", "Name of your database.")
 	)
 
-	c, _ := branch.LoadConfiguration(configDir)
-
 	// Get command line arguments
 	flag.Parse()
 
-	hostDir := c.RootDir + *refSlug
-	pm2Dir := c.RootDir + c.Testing.PmDir
-	dbName := fmt.Sprintf("%s", branch.PassArguments(*refSlug))
+	// Load json configuration
+	conf, err := branch.ReadConfig("env")
+	if err != nil {
+		panic(fmt.Errorf("Error when reading config: %v\n", err))
+	}
 
-	// Remove virtual host directory
-	branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s", hostDir))
+	// Get server hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
 
-	// Remove nginx configuration file for virtual host
-	branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", c.Testing.NginxSettings, *refSlug))
-
-	// Remove php-fpm configuration file for virtual host
-	branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", c.Testing.PoolSettings, *refSlug))
-
-	// Remove pm2 process and configuration file for virtual host
-	branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 delete --silent %s", *refSlug))
-	branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.json", pm2Dir, *refSlug))
+	// Variables
+	hostDir := conf.GetString("rootdir") + *refSlug
+	pm2Dir := conf.GetString("rootdir") + conf.GetString("server.pm2")
+	dbName := fmt.Sprintf("%s", branch.ParseBranchName(*refSlug))
 
 	// Delete MySQL database
 	// [user[:pass]@][protocol[(addr)]]/dbname[?p1=v1&...]
@@ -81,13 +80,28 @@ func main() {
 		log.Printf("MySQL: Query OK, %d rows affected\n\n", count)
 	}
 
-	dropuser, err := db.Exec(fmt.Sprintf("DROP USER '%s'@'localhost';", dbName))
+	user, err := db.Exec(fmt.Sprintf("DROP USER '%s'@'localhost';", dbName))
 	if err != nil {
 		log.Fatalf(err.Error())
 	} else {
-		count, _ := dropuser.RowsAffected()
+		count, _ := user.RowsAffected()
 		log.Printf("MySQL: Running: DROP USER '%s'@'localhost';\n", dbName)
 		log.Printf("MySQL: Query OK, %d rows affected\n\n", count)
+	}
+
+	// Remove virtual host directory
+	branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s", hostDir))
+
+	// Remove nginx configuration file for virtual host
+	branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", conf.GetString("nginxdir"), *refSlug))
+
+	// Remove php-fpm configuration file for virtual host
+	branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", conf.GetString("fpmdir"), *refSlug))
+
+	if strings.Contains(hostname, "intranet") {
+		// Remove pm2 process and configuration file for virtual host
+		branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 delete --silent %s", *refSlug))
+		branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.json", pm2Dir, *refSlug))
 	}
 
 	// Restart nginx and php-fpm

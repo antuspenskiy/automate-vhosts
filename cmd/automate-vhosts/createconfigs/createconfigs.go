@@ -9,14 +9,15 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/antuspenskiy/automate-vhosts/pkg/branch"
 )
 
 var (
-	Version     = "undefined"
-	BuildTime   = "undefined"
-	GitHash     = "undefined"
+	Version   = "undefined"
+	BuildTime = "undefined"
+	GitHash   = "undefined"
 )
 
 func main() {
@@ -26,45 +27,60 @@ func main() {
 
 	// Set the command line arguments
 	var (
-		configDir = "/opt/scripts/configs/config.json"
-		refSlug   = flag.String("CI_COMMIT_REF_SLUG", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
+		refSlug = flag.String("refslug", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
 	)
-
-	c, _ := branch.LoadConfiguration(configDir)
 
 	// Get command line arguments
 	flag.Parse()
 
-	hostDir := c.RootDir + *refSlug
-	pm2Dir := c.RootDir + c.Testing.PmDir
+	// Load json configuration
+	conf, err := branch.ReadConfig("env")
+	if err != nil {
+		panic(fmt.Errorf("Error when reading config: %v\n", err))
+	}
+
+	// Get server hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+
+	// Variables
+	hostDir := conf.GetString("rootdir") + *refSlug
+	pm2Dir := conf.GetString("server.pm2")
 
 	// Generate random port for nginx, php-fpm and pm2 configuration
 	portphp := branch.RandomTCPPort()
 	portnode := branch.RandomTCPPort()
 
 	// Create nginx configuration for virtual host
-	if branch.DirectoryExists(fmt.Sprintf("%s/%s.conf", c.Testing.NginxSettings, *refSlug)) {
+	if branch.DirectoryExists(fmt.Sprintf("%s/%s.conf", conf.GetString("nginxdir"), *refSlug)) {
+		log.Printf("Nginx configuration for %s/%s.conf exist\n", conf.GetString("nginxdir"), *refSlug)
 	} else {
-		templateData := branch.NginxTemplate{
-			fmt.Sprintf("%s.%s", *refSlug, c.Testing.Hostname),
-			portphp,
-			portnode,
-			fmt.Sprintf("%s", *refSlug),
+
+		// TODO: Refactor to func
+		nginxData := branch.NginxTemplate{
+			ServerName: fmt.Sprintf("%s.%s", *refSlug, conf.GetString("subdomain")),
+			PortPhp:    portphp,
+			PortNode:   portnode,
+			RefSlug:    *refSlug,
 		}
 
-		txt := branch.ParseTemplate(fmt.Sprintf("%s", c.Testing.NginxTemplate), templateData)
-		branch.WriteStringToFile(fmt.Sprintf("%s/%s.conf", c.Testing.NginxSettings, *refSlug), txt)
-
+		txt := branch.ParseTemplate(conf.GetString("server.nginxtmpl"), nginxData)
+		branch.WriteStringToFile(fmt.Sprintf("%s/%s.conf", conf.GetString("nginxdir"), *refSlug), txt)
+		log.Printf("Nginx configuration for %s/%s.conf created\n", conf.GetString("nginxdir"), *refSlug)
 	}
 
-	// Create php-fpm configuration for virtual host
-	if branch.DirectoryExists(fmt.Sprintf("%s/%s.conf", c.Testing.PoolSettings, *refSlug)) {
+	// Create php-fpm configuration
+	if branch.DirectoryExists(fmt.Sprintf("%s/%s.conf", conf.GetString("fpmdir"), *refSlug)) {
+		log.Printf("Php-fpm configuration for %s/%s.conf exist\n", conf.GetString("fpmdir"), *refSlug)
 	} else {
-		fileHandle, err := os.Create(fmt.Sprintf("%s/%s.conf", c.Testing.PoolSettings, *refSlug))
+		fileHandle, err := os.Create(fmt.Sprintf("%s/%s.conf", conf.GetString("fpmdir"), *refSlug))
 		if err != nil {
 			log.Println("Error creating configuration file:", err)
 			return
 		}
+		// TODO: Refactor to func
 		writer := bufio.NewWriter(fileHandle)
 		defer fileHandle.Close()
 
@@ -76,60 +92,67 @@ func main() {
 		fmt.Fprintln(writer, "pm.max_requests = 500")
 		fmt.Fprintln(writer, "request_terminate_timeout = 65m")
 		fmt.Fprintln(writer, "php_admin_value[max_execution_time] = 300")
-		fmt.Fprintln(writer, "php_admin_value[mbstring.func_overload] = 4")
+
+		if strings.Contains(hostname, "intranet") {
+			fmt.Fprintln(writer, "php_admin_value[mbstring.func_overload] = 4")
+		}
+
 		fmt.Fprintln(writer, "php_admin_value[sendmail_path] = false")
 		writer.Flush()
 
-		log.Printf("php-fpm configuration %s/%s.conf created\n", c.Testing.PoolSettings, *refSlug)
+		log.Printf("Php-fpm configuration for %s/%s.conf created\n", conf.GetString("fpmdir"), *refSlug)
 
 		branch.RunCommand("bash", "-c", "systemctl restart nginx php-fpm")
 	}
 
-	// Create pm2 configuration for virtual host
-	if branch.DirectoryExists(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug)) {
-		// Reload pm2 process
-		branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 gracefulReload %s --update-env development", *refSlug))
-	} else {
-		var buf bytes.Buffer
-		post := &branch.Post{
-			Apps: []branch.App{
-				{
-					"fork_mode",
-					"tools/run.js",
-					[]string{"start"},
-					fmt.Sprintf("%s", *refSlug),
-					hostDir,
-					branch.Env{
-						portnode,
-						"development",
-					},
-					fmt.Sprintf("log/%s.err.log", *refSlug),
-					fmt.Sprintf("log/%s.out.log", *refSlug),
-				},
-			},
-		}
-		branch.EncodeTo(&buf, post)
-
-		// Pretty print json file
-		data, err := json.MarshalIndent(post, "", " ")
-		if err != nil {
-			log.Fatalln("MarshalIndent:", err)
-		}
-		log.Printf("pm2 json configuration created:\n%s", data)
-
-		if fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug) != "" {
-			if err = ioutil.WriteFile(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug), data, 0644); err != nil {
-				log.Fatalln("WriteFile:", err)
-			}
-
-			// Chown pm2 file with user.user permissions
-			os.Chown(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug), 1000, 1000)
-
-			// Start pm2 process
-			branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s/%s.json", pm2Dir, *refSlug))
-
+	// Create pm2 configuration for test-intranet
+	if strings.Contains(hostname, "intranet") {
+		if branch.DirectoryExists(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug)) {
+			// Reload pm2 process
+			branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 gracefulReload %s --update-env development", *refSlug))
 		} else {
-			log.Printf("%s\n", string(data))
+			var buf bytes.Buffer
+			post := &branch.Post{
+				Apps: []branch.App{
+					{
+						ExecMode: "fork_mode",
+						Script:   "tools/run.js",
+						Args:     []string{"start"},
+						Name:     *refSlug,
+						Cwd:      hostDir,
+						Env: branch.Env{
+							Port:    portnode,
+							NodeEnv: "development",
+						},
+						ErrorFile: fmt.Sprintf("log/%s.err.log", *refSlug),
+						OutFile:   fmt.Sprintf("log/%s.out.log", *refSlug),
+					},
+				},
+			}
+			branch.EncodeTo(&buf, post)
+
+			// Pretty print json file
+			data, err := json.MarshalIndent(post, "", " ")
+			if err != nil {
+				log.Fatalln("MarshalIndent:", err)
+			}
+			log.Printf("PM2 JSON configuration created:\n%s", data)
+
+			if fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug) != "" {
+				if err = ioutil.WriteFile(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug), data, 0644); err != nil {
+					log.Fatalln("WriteFile:", err)
+				}
+
+				// Chown pm2 file with user.user permissions
+				os.Chown(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug), 1000, 1000)
+
+				// Start pm2 process
+				branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s/%s.json", pm2Dir, *refSlug))
+
+			} else {
+				log.Printf("%s\n", string(data))
+			}
 		}
 	}
+
 }

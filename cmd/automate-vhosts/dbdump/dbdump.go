@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	Version     = "undefined"
-	BuildTime   = "undefined"
-	GitHash     = "undefined"
+	Version   = "undefined"
+	BuildTime = "undefined"
+	GitHash   = "undefined"
 )
 
 func main() {
