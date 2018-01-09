@@ -133,7 +133,7 @@ func main() {
 		} else {
 
 			log.Println("Run parse settings...")
-			branch.ParseSettings(bxConf, bxConn, conf.GetString("server.parse"), hostDir, refSlug)
+			branch.ParseSettings(bxConf, bxConn, conf.GetString("server.parse"), hostDir, dbName)
 			log.Println("Parse complete.")
 		}
 	}

@@ -267,10 +267,10 @@ func Deploy(conf string) []string {
 }
 
 // ParseSettings parse settings for intranet-test virtual hosts
-func ParseSettings(bxconf string, bxconn string, parse string, hostdir string, refslug *string) {
+func ParseSettings(bxconf string, bxconn string, parse string, hostdir string, dbname string) {
 	RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", bxconf, bxconf))
 	RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", bxconn, bxconn))
-	RunCommand("bash", "-c", fmt.Sprintf("php -f %s %s %s %s", parse, hostdir, *refslug, *refslug))
+	RunCommand("bash", "-c", fmt.Sprintf("php -f %s %s %s %s", parse, hostdir, dbname, dbname))
 }
 
 // IsTCPPortAvailable returns a flag indicating whether or not a TCP port is
