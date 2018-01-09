@@ -89,6 +89,15 @@ func main() {
 		log.Printf("MySQL: Query OK, %d rows affected\n\n", count)
 	}
 
+	flush, err := db.Exec(fmt.Sprintf("FLUSH PRIVILEGES;"))
+	if err != nil {
+		log.Fatalf(err.Error())
+	} else {
+		count, _ := flush.RowsAffected()
+		log.Printf("MySQL: Running: FLUSH PRIVILEGES;")
+		log.Printf("MySQL: Query OK, %d rows affected\n\n", count)
+	}
+
 	// Remove virtual host directory
 	branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s", hostDir))
 

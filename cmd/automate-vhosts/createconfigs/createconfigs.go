@@ -108,8 +108,10 @@ func main() {
 	// Create pm2 configuration for test-intranet
 	if strings.Contains(hostname, "intranet") {
 		if branch.DirectoryExists(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug)) {
-			// Reload pm2 process
-			branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 gracefulReload %s --update-env development", *refSlug))
+			// Don't reload process, delete it and start again
+			branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 describe %s", *refSlug))
+			branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 delete -s %s || :", *refSlug))
+			branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s/%s.json", pm2Dir, *refSlug))
 		} else {
 			var buf bytes.Buffer
 			post := &branch.Post{
