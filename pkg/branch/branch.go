@@ -17,8 +17,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/spf13/viper"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/spf13/viper"
 	"github.com/antuspenskiy/automate-vhosts-copy/pkg/branch"
 )
 
@@ -332,4 +332,19 @@ func EncodeTo(w io.Writer, i interface{}) {
 	if err := encoder.Encode(i); err != nil {
 		log.Fatalf("failed encoding to writer: %s", err)
 	}
+}
+
+// difference returns the elements in a that aren't in b
+func Difference(a, b []string) []string {
+	mb := map[string]bool{}
+	for _, x := range b {
+		mb[x] = true
+	}
+	ab := []string{}
+	for _, x := range a {
+		if _, ok := mb[x]; !ok {
+			ab = append(ab, x)
+		}
+	}
+	return ab
 }
