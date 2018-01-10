@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="1.0.4-alpha"
+version="1.0.5-alpha"
 githash=`git rev-parse HEAD`
 buildtime=`date -u '+%Y-%m-%d_%I:%M:%S%p'`
 
