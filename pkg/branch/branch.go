@@ -19,15 +19,15 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
-	"github.com/antuspenskiy/automate-vhosts-copy/pkg/branch"
 )
 
-// LibPost represents a struct for Library configuration
+// LibPost represents a struct for library configuration
 type LibPost struct {
 	P LibConfiguration `json:"production"`
 	D LibConfiguration `json:"development"`
 }
 
+// BaseConfig represent a struct for database settings
 type BaseConfig struct {
 	BaseName string `json:"BASE_NAME"`
 	UserName string `json:"USER_NAME"`
@@ -35,9 +35,10 @@ type BaseConfig struct {
 	Host     string `json:"HOST"`
 }
 
+// LibConfiguration represent a struct for library configuration
 type LibConfiguration struct {
 	BaseConfig        BaseConfig `json:"BASE_CONFIG"`
-	ExternalServerApi string     `json:"EXTERNAL_SERVER_API"`
+	ExternalServerAPI string     `json:"EXTERNAL_SERVER_API"`
 }
 
 // Post represent pm2 struct which contains an array of variables
@@ -45,6 +46,7 @@ type Post struct {
 	Apps []App `json:"apps"`
 }
 
+// App represent struct for pm2 json configuration
 type App struct {
 	ExecMode  string   `json:"exec_mode"`
 	Script    string   `json:"script"`
@@ -56,11 +58,13 @@ type App struct {
 	OutFile   string   `json:"out_file"`
 }
 
+// Env represent struct for port generator
 type Env struct {
 	Port    int    `json:"PORT"`
 	NodeEnv string `json:"NODE_ENV"`
 }
 
+// NginxTemplate represent struct for nginx configuration
 type NginxTemplate struct {
 	ServerName string
 	PortPhp    int
@@ -68,8 +72,9 @@ type NginxTemplate struct {
 	RefSlug    string
 }
 
+// LaravelTemplate represent struct for laravel environment configuration
 type LaravelTemplate struct {
-	AppUrl     string
+	AppURL     string
 	DBDatabase string
 	DBUserName string
 	DBPassword string
@@ -103,10 +108,9 @@ func ParseBranchName(name string) string {
 		branchCut := branchString[0:32]
 		fmt.Printf("A string of %s becomes %s \n", name, branchCut)
 		return branchCut
-	} else {
-		fmt.Printf("A string of %s becomes %s \n", name, branchString)
-		return branchString
 	}
+	fmt.Printf("A string of %s becomes %s \n", name, branchString)
+	return branchString
 }
 
 // ReadConfig read json environment file from directory
@@ -167,49 +171,6 @@ func DirectoryExists(dir string) bool {
 	return true
 }
 
-// PipeLine run pipline commands
-func PipeLine(cmds ...*exec.Cmd) (pipeLineOutput, collectedStandardError []byte, pipeLineError error) {
-	// Require at least one command
-	if len(cmds) < 1 {
-		return nil, nil, nil
-	}
-
-	// Collect the output from the command(s)
-	var output bytes.Buffer
-	var stderr bytes.Buffer
-
-	last := len(cmds) - 1
-	for i, cmd := range cmds[:last] {
-		var err error
-		// Connect each command's stdin to the previous command's stdout
-		if cmds[i+1].Stdin, err = cmd.StdoutPipe(); err != nil {
-			return nil, nil, err
-		}
-		// Connect each command's stderr to a buffer
-		cmd.Stderr = &stderr
-	}
-
-	// Connect the output and error for the last command
-	cmds[last].Stdout, cmds[last].Stderr = &output, &stderr
-
-	// Start each command
-	for _, cmd := range cmds {
-		if err := cmd.Start(); err != nil {
-			return output.Bytes(), stderr.Bytes(), err
-		}
-	}
-
-	// Wait for each command to complete
-	for _, cmd := range cmds {
-		if err := cmd.Wait(); err != nil {
-			return output.Bytes(), stderr.Bytes(), err
-		}
-	}
-
-	// Return the pipeline output and the collected standard error
-	return output.Bytes(), stderr.Bytes(), nil
-}
-
 // UnpackGzipFile extract sql.gz file
 func UnpackGzipFile(gzFilePath, dstFilePath string) (int64, error) {
 	gzFile, err := os.Open(gzFilePath)
@@ -261,9 +222,52 @@ func Deploy(conf string) []string {
 	commands := strings.Split(cmd, ",")
 
 	for _, command := range commands {
-		branch.RunCommand("bash", "-c", command)
+		RunCommand("bash", "-c", command)
 	}
 	return commands
+}
+
+// PipeLine run pipline commands
+func PipeLine(cmds ...*exec.Cmd) (pipeLineOutput, collectedStandardError []byte, pipeLineError error) {
+	// Require at least one command
+	if len(cmds) < 1 {
+		return nil, nil, nil
+	}
+
+	// Collect the output from the command(s)
+	var output bytes.Buffer
+	var stderr bytes.Buffer
+
+	last := len(cmds) - 1
+	for i, cmd := range cmds[:last] {
+		var err error
+		// Connect each command's stdin to the previous command's stdout
+		if cmds[i+1].Stdin, err = cmd.StdoutPipe(); err != nil {
+			return nil, nil, err
+		}
+		// Connect each command's stderr to a buffer
+		cmd.Stderr = &stderr
+	}
+
+	// Connect the output and error for the last command
+	cmds[last].Stdout, cmds[last].Stderr = &output, &stderr
+
+	// Start each command
+	for _, cmd := range cmds {
+		if err := cmd.Start(); err != nil {
+			return output.Bytes(), stderr.Bytes(), err
+		}
+	}
+
+	// Wait for each command to complete
+	for _, cmd := range cmds {
+		if err := cmd.Wait(); err != nil {
+			return output.Bytes(), stderr.Bytes(), err
+		}
+	}
+
+	// Return the pipeline output and the collected standard error
+	return output.Bytes(), stderr.Bytes(), nil
 }
 
 // ParseSettings parse settings for intranet-test virtual hosts
@@ -299,6 +303,7 @@ func RandomTCPPort() int {
 	return -1
 }
 
+// WriteStringToFile save configuration files in filesystem
 func WriteStringToFile(filepath, s string) error {
 	fo, err := os.Create(filepath)
 	if err != nil {
@@ -315,6 +320,7 @@ func WriteStringToFile(filepath, s string) error {
 	return nil
 }
 
+// ParseTemplate is parse struct variables in different templates for configuration files
 func ParseTemplate(templateFileName string, data interface{}) string {
 	t, err := template.ParseFiles(templateFileName)
 	if err != nil {
@@ -327,6 +333,7 @@ func ParseTemplate(templateFileName string, data interface{}) string {
 	return buf.String()
 }
 
+// EncodeTo save configuration files in json
 func EncodeTo(w io.Writer, i interface{}) {
 	encoder := json.NewEncoder(w)
 	if err := encoder.Encode(i); err != nil {
@@ -334,7 +341,7 @@ func EncodeTo(w io.Writer, i interface{}) {
 	}
 }
 
-// difference returns the elements in a that aren't in b
+// Difference returns the elements in a that aren't in b
 func Difference(a, b []string) []string {
 	mb := map[string]bool{}
 	for _, x := range b {
@@ -347,4 +354,13 @@ func Difference(a, b []string) []string {
 		}
 	}
 	return ab
+}
+
+// GetHostname get os.Hostname
+func GetHostname() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatalf("error get server hostname: %v\n", err)
+	}
+	return hostname
 }
