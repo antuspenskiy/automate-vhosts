@@ -7,23 +7,30 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
 	"os/exec"
 	"time"
+	"os"
 
 	"github.com/antuspenskiy/automate-vhosts/pkg/branch"
 )
 
+var Usage = func() {
+	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+	flag.PrintDefaults()
+}
+
 var (
-	Version   = "undefined"
-	BuildTime = "undefined"
-	GitHash   = "undefined"
+	VERSION   = "undefined"
+	BUILDTIME = "undefined"
+	COMMIT    = "undefined"
+	BRANCH    = "undefined"
 )
 
 func main() {
-	fmt.Printf("Version    : %s\n", Version)
-	fmt.Printf("Git Hash   : %s\n", GitHash)
-	fmt.Printf("Build Time : %s\n\n", BuildTime)
+	fmt.Printf("Version    : %s\n", VERSION)
+	fmt.Printf("Git Hash   : %s\n", COMMIT)
+	fmt.Printf("Build Time : %s\n", BUILDTIME)
+	fmt.Printf("Branch     : %s\n\n", BRANCH)
 
 	// Set the command line arguments
 	var (
@@ -39,8 +46,8 @@ func main() {
 	// Get command line arguments
 	flag.Parse()
 
-	// Get the hostname
-	hostname, err := os.Hostname()
+	// Get server hostname
+	hostname := branch.GetHostname()
 
 	filename := ""
 	current := time.Now()
@@ -77,7 +84,7 @@ func main() {
 	cmd := exec.Command("/bin/bash", "-c", mysqldumpCommand)
 	var out bytes.Buffer
 	cmd.Stdout = &out
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		log.Fatalf("Error: %v\n", err)
 	}

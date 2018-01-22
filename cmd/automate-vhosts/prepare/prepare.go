@@ -13,16 +13,23 @@ import (
 	"github.com/antuspenskiy/automate-vhosts/pkg/branch"
 )
 
+var Usage = func() {
+	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+	flag.PrintDefaults()
+}
+
 var (
-	Version   = "undefined"
-	BuildTime = "undefined"
-	GitHash   = "undefined"
+	VERSION    = "undefined"
+	BUILDTIME  = "undefined"
+	COMMIT    = "undefined"
+	BRANCH = "undefined"
 )
 
 func main() {
-	fmt.Printf("Version    : %s\n", Version)
-	fmt.Printf("Git Hash   : %s\n", GitHash)
-	fmt.Printf("Build Time : %s\n\n", BuildTime)
+	fmt.Printf("Version    : %s\n", VERSION)
+	fmt.Printf("Git Hash   : %s\n", COMMIT)
+	fmt.Printf("Build Time : %s\n", BUILDTIME)
+	fmt.Printf("Branch 	   : %s\n\n", BRANCH)
 
 	// Set the command line arguments
 	var (
@@ -36,14 +43,11 @@ func main() {
 	// Load json configuration
 	conf, err := branch.ReadConfig("env")
 	if err != nil {
-		panic(fmt.Errorf("Error when reading config: %v\n", err))
+		log.Fatalf("error when reading config: %v\n", err)
 	}
 
 	// Get server hostname
-	hostname, err := os.Hostname()
-	if err != nil {
-		panic(err)
-	}
+	hostname := branch.GetHostname()
 
 	// Variables
 	hostDir := conf.GetString("rootdir") + *refSlug
@@ -77,7 +81,7 @@ func main() {
 						Password: dbName,
 						Host:     "localhost",
 					},
-					ExternalServerApi: "https://127.0.0.1",
+					ExternalServerAPI: "https://127.0.0.1",
 				},
 				D: branch.LibConfiguration{
 					BaseConfig: branch.BaseConfig{
@@ -86,7 +90,7 @@ func main() {
 						Password: dbName,
 						Host:     "localhost",
 					},
-					ExternalServerApi: "https://127.0.0.1",
+					ExternalServerAPI: "https://127.0.0.1",
 				},
 			}
 			branch.EncodeTo(&buf, post)
@@ -108,7 +112,7 @@ func main() {
 		// Create environment .env for Laravel applications
 		if strings.Contains(hostname, "ees") {
 			laravelData := branch.LaravelTemplate{
-				AppUrl:     *refSlug,
+				AppURL:     *refSlug,
 				DBDatabase: dbName,
 				DBUserName: dbName,
 				DBPassword: dbName,
