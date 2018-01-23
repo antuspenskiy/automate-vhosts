@@ -13,15 +13,14 @@ import (
 	"github.com/antuspenskiy/automate-vhosts/pkg/branch"
 )
 
-var Usage = func() {
-	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-	flag.PrintDefaults()
-}
-
 var (
-	VERSION    = "undefined"
-	BUILDTIME  = "undefined"
-	COMMIT    = "undefined"
+	// VERSION used to show version of CLI
+	VERSION = "undefined"
+	// BUILDTIME used to show buildtime of CLI
+	BUILDTIME = "undefined"
+	// COMMIT used to show commit when CLI compiled
+	COMMIT = "undefined"
+	// BRANCH used to show branchname when CLI compiled
 	BRANCH = "undefined"
 )
 
@@ -42,9 +41,7 @@ func main() {
 
 	// Load json configuration
 	conf, err := branch.ReadConfig("env")
-	if err != nil {
-		log.Fatalf("error when reading config: %v\n", err)
-	}
+	branch.Check(err)
 
 	// Get server hostname
 	hostname := branch.GetHostname()
@@ -58,7 +55,8 @@ func main() {
 	if branch.DirectoryExists(hostDir) {
 
 		log.Printf("Directory %s exists.\n\n", hostDir)
-		os.Chdir(hostDir)
+		err = os.Chdir(hostDir)
+		branch.Check(err)
 
 		branch.RunCommand("bash", "-c", "git fetch --prune origin")
 		branch.RunCommand("bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
@@ -67,8 +65,10 @@ func main() {
 
 	} else {
 		log.Printf("Create directory %s.\n\n", hostDir)
-		os.Mkdir(hostDir, 0750)
-		os.Chdir(hostDir)
+		err = os.Mkdir(hostDir, 0700)
+		branch.Check(err)
+		err = os.Chdir(hostDir)
+		branch.Check(err)
 
 		// Create library configuration file for intranet-test, need before func Deploy()
 		if strings.Contains(hostname, "intranet") {
@@ -96,9 +96,9 @@ func main() {
 			branch.EncodeTo(&buf, post)
 
 			// Pretty print json file
-			data, err := json.MarshalIndent(post, "", " ")
-			if err != nil {
-				log.Fatalln("MarshalIndent:", err)
+			data, cerr := json.MarshalIndent(post, "", " ")
+			if cerr != nil {
+				log.Fatalln("MarshalIndent:", cerr)
 			}
 			log.Printf("Library JSON configuration created:\n%s", data)
 
@@ -121,8 +121,9 @@ func main() {
 			log.Printf("Create environment file %s/.env\n", hostDir)
 
 			txt := branch.ParseTemplate(conf.GetString("server.envtmpl"), laravelData)
-			branch.WriteStringToFile(fmt.Sprintf("%s/.env", hostDir), txt)
-			log.Printf("Environemnt configuration for %s/.env created\n", hostDir)
+			err = branch.WriteStringToFile(fmt.Sprintf("%s/.env", hostDir), txt)
+			branch.Check(err)
+			log.Printf("Environment configuration for %s/.env created\n", hostDir)
 		}
 
 		branch.RunCommand("bash", "-c", "git init")
@@ -135,7 +136,6 @@ func main() {
 	if strings.Contains(hostname, "intranet") {
 		if branch.DirectoryExists(bxConf) || branch.DirectoryExists(bxConn) {
 		} else {
-
 			log.Println("Run parse settings...")
 			branch.ParseSettings(bxConf, bxConn, conf.GetString("server.parse"), hostDir, dbName)
 			log.Println("Parse complete.")
