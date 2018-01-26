@@ -108,16 +108,16 @@ func main() {
 
 		log.Printf("Php-fpm configuration for %s/%s.conf created\n", conf.GetString("fpmdir"), *refSlug)
 
-		branch.RunCommand("bash", "-c", "systemctl restart nginx php-fpm")
+		branch.RunCommand("/bin/bash", "-c", "systemctl restart nginx php-fpm")
 	}
 
 	// Create pm2 configuration for test-intranet
 	if strings.Contains(hostname, "intranet") {
 		if branch.DirectoryExists(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug)) {
 			// Don't reload process, delete it and start again
-			branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 describe %s", *refSlug))
-			branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 delete -s %s || :", *refSlug))
-			branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s/%s.json", pm2Dir, *refSlug))
+			branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("sudo -u user pm2 describe %s", *refSlug))
+			branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("sudo -u user pm2 delete -s %s || :", *refSlug))
+			branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s/%s.json", pm2Dir, *refSlug))
 		} else {
 			var buf bytes.Buffer
 			post := &branch.Post{
@@ -156,7 +156,7 @@ func main() {
 				branch.Check(err)
 
 				// Start pm2 process
-				branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s/%s.json", pm2Dir, *refSlug))
+				branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s/%s.json", pm2Dir, *refSlug))
 
 			} else {
 				log.Printf("%s\n", string(data))

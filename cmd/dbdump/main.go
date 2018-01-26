@@ -103,10 +103,10 @@ func main() {
 
 	// TODO: Better to use semicolon for rm {} \;
 	// Rotate dumps then synchronize it via rsync
-	branch.RunCommand("bash", "-c", fmt.Sprintf("find %s/ -name '*.sql.gz' -type f -mtime +14 -exec rm {} +", *backupDir))
+	branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("find %s/ -name '*.sql.gz' -type f -mtime +14 -exec rm {} +", *backupDir))
 
 	// Synchronize backup directory with storage directory
-	branch.RunCommand("bash", "-c", fmt.Sprintf("rsync -avpze --progress --stats --delete %s/ %s/", *backupDir, *storageDir))
+	branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("rsync -avpze --progress --stats --delete %s/ %s/", *backupDir, *storageDir))
 
 	log.Printf("Dump database %s finished.\n", *mysqlDb)
 

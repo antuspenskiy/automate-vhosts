@@ -57,14 +57,14 @@ func main() {
 	// List remote branches, only 2nd row without refs/heads/
 	err = os.Chdir(hostDir)
 	branch.Check(err)
-	gitlsRemote, err := exec.Command("bash", "-c", "sudo -u user git ls-remote --heads origin | awk '{print $2}' | sed 's/.*\\/\\(.*\\).*/\\1/'").CombinedOutput()
+	gitlsRemote, err := exec.Command("/bin/bash", "-c", "sudo -u user git ls-remote --heads origin | awk '{print $2}' | sed 's/.*\\/\\(.*\\).*/\\1/'").CombinedOutput()
 	branch.Check(err)
 	fmt.Printf("\nRemote Branches:\n\n%s\n", gitlsRemote)
 
 	// List folders
 	err = os.Chdir(conf.GetString("rootdir"))
 	branch.Check(err)
-	lsFolder, err := exec.Command("bash", "-c", "ls -d */ | grep -v 'pm2json\\|log\\|intranet\\|default' | cut -f1 -d'/'").CombinedOutput()
+	lsFolder, err := exec.Command("/bin/bash", "-c", "ls -d */ | grep -v 'pm2json\\|log\\|intranet\\|default' | cut -f1 -d'/'").CombinedOutput()
 	branch.Check(err)
 	fmt.Printf("Branches Folders:\n\n%s\n", lsFolder)
 
@@ -125,20 +125,20 @@ func main() {
 		log.Printf("MySQL: Query OK, %d rows affected\n\n", numflush)
 
 		// Remove virtual host directory
-		branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s", diffVal))
+		branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("rm -fr %s", diffVal))
 
 		// Remove nginx configuration file for virtual host
-		branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", conf.GetString("nginxdir"), diffVal))
+		branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", conf.GetString("nginxdir"), diffVal))
 
 		// Remove php-fpm configuration file for virtual host
-		branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", conf.GetString("fpmdir"), diffVal))
+		branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", conf.GetString("fpmdir"), diffVal))
 
 		if strings.Contains(hostname, "intranet") {
 			// Remove pm2 process and configuration file for virtual host
-			branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 delete --silent %s", diffVal))
-			branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.json", pm2Dir, diffVal))
+			branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("sudo -u user pm2 delete --silent %s", diffVal))
+			branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("rm -fr %s/%s.json", pm2Dir, diffVal))
 		}
 	}
 	// Restart nginx and php-fpm
-	branch.RunCommand("bash", "-c", "systemctl restart nginx php-fpm")
+	branch.RunCommand("/bin/bash", "-c", "systemctl restart nginx php-fpm")
 }

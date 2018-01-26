@@ -56,7 +56,7 @@ func main() {
 
 	// Use Format for extracted file, so they don't conflicted
 	current := time.Now()
-	dumpFileDst := (fmt.Sprintf("%s/dump_%s.sql", conf.GetString("dbdir"), (current.Format("20060102.150405"))))
+	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", conf.GetString("dbdir"), current.Format("20060102.150405"))
 
 	if branch.DirectoryExists(conf.GetString("storagedir")) {
 		err = os.Chdir(conf.GetString("storagedir"))
@@ -123,7 +123,7 @@ func main() {
 		log.Printf("MySQL: Query OK, %d rows affected\n\n", numflush)
 
 		// Import database dump
-		branch.RunCommand("bash", "-c", fmt.Sprintf("time mysql -u%s %s < %s", *mysqlUser, dbName, dumpFileDst))
+		branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("time mysql -u%s %s < %s", *mysqlUser, dbName, dumpFileDst))
 
 		if strings.Contains(hostname, "ees") {
 			numsal, err := branch.DropSalary(db, dbName)
@@ -135,5 +135,5 @@ func main() {
 		log.Fatalf("Error: No such file or directory %v\n", conf.GetString("storagedir"))
 	}
 	// Delete database dbdump's
-	branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/*.sql*", conf.GetString("dbdir")))
+	branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("rm -fr %s/*.sql*", conf.GetString("dbdir")))
 }

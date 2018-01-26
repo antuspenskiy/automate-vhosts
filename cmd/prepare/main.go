@@ -58,8 +58,8 @@ func main() {
 		err = os.Chdir(hostDir)
 		branch.Check(err)
 
-		branch.RunCommand("bash", "-c", "git fetch --prune origin")
-		branch.RunCommand("bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
+		branch.RunCommand("/bin/bash", "-c", "git fetch --prune origin")
+		branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
 
 		branch.Deploy(conf.GetString("server.cmd-dir-exist"))
 
@@ -126,9 +126,9 @@ func main() {
 			log.Printf("Environment configuration for %s/.env created\n", hostDir)
 		}
 
-		branch.RunCommand("bash", "-c", "git init")
-		branch.RunCommand("bash", "-c", fmt.Sprintf("git remote add -t %s -f origin %s", *refSlug, conf.GetString("server.giturl")))
-		branch.RunCommand("bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
+		branch.RunCommand("/bin/bash", "-c", "git init")
+		branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("git remote add -t %s -f origin %s", *refSlug, conf.GetString("server.giturl")))
+		branch.RunCommand("/bin/bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
 
 		branch.Deploy(conf.GetString("server.cmd-dir-not-exist"))
 	}
