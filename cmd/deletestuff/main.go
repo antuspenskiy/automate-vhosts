@@ -10,18 +10,18 @@ import (
 	"strings"
 
 	"github.com/antuspenskiy/automate-vhosts/pkg/branch"
+	_ "github.com/go-sql-driver/mysql"
 )
 
-var Usage = func() {
-	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-	flag.PrintDefaults()
-}
-
 var (
-	VERSION   = "undefined"
+	// VERSION used to show version of CLI
+	VERSION = "undefined"
+	// BUILDTIME used to show buildtime of CLI
 	BUILDTIME = "undefined"
-	COMMIT    = "undefined"
-	BRANCH    = "undefined"
+	// COMMIT used to show commit when CLI compiled
+	COMMIT = "undefined"
+	// BRANCH used to show branchname when CLI compiled
+	BRANCH = "undefined"
 )
 
 func main() {
@@ -45,9 +45,7 @@ func main() {
 
 	// Load json configuration
 	conf, err := branch.ReadConfig("env")
-	if err != nil {
-		log.Fatalf("error when reading config: %v\n", err)
-	}
+	branch.Check(err)
 
 	// Get server hostname
 	hostname := branch.GetHostname()
@@ -57,19 +55,17 @@ func main() {
 	pm2Dir := conf.GetString("rootdir") + conf.GetString("server.pm2")
 
 	// List remote branches, only 2nd row without refs/heads/
-	os.Chdir(hostDir)
+	err = os.Chdir(hostDir)
+	branch.Check(err)
 	gitlsRemote, err := exec.Command("bash", "-c", "sudo -u user git ls-remote --heads origin | awk '{print $2}' | sed 's/.*\\/\\(.*\\).*/\\1/'").CombinedOutput()
-	if err != nil {
-		os.Stderr.WriteString(err.Error())
-	}
+	branch.Check(err)
 	fmt.Printf("\nRemote Branches:\n\n%s\n", gitlsRemote)
 
 	// List folders
-	os.Chdir(conf.GetString("rootdir"))
-	lsFolder, err := exec.Command("bash", "-c", "ls -d */ | grep -v 'pm2json\\|log\\|intranet' | cut -f1 -d'/'").CombinedOutput()
-	if err != nil {
-		os.Stderr.WriteString(err.Error())
-	}
+	err = os.Chdir(conf.GetString("rootdir"))
+	branch.Check(err)
+	lsFolder, err := exec.Command("bash", "-c", "ls -d */ | grep -v 'pm2json\\|log\\|intranet\\|default' | cut -f1 -d'/'").CombinedOutput()
+	branch.Check(err)
 	fmt.Printf("Branches Folders:\n\n%s\n", lsFolder)
 
 	// Convert []byte to string and split string to []string
@@ -91,7 +87,10 @@ func main() {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+		branch.Check(err)
+	}()
 
 	// make sure connection is available
 	err = db.Ping()
@@ -106,36 +105,24 @@ func main() {
 		fmt.Printf("This folder and settings will be deleted:\n%s\n\n", diffVal)
 
 		// dbName not equal diffVal we need to parse this values in ParseBranchName
-		dbName := fmt.Sprintf("%s", branch.ParseBranchName(diffVal))
+		dbName := branch.ParseBranchName(diffVal)
 
 		// Delete MySQL database
 
-		drop, err := db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s;", dbName))
-		if err != nil {
-			log.Fatalf(err.Error())
-		} else {
-			count, _ := drop.RowsAffected()
-			log.Printf("MySQL: Running: DROP DATABASE IF EXISTS %s;\n", dbName)
-			log.Printf("MySQL: Query OK, %d rows affected\n\n", count)
-		}
+		numdrop, err := branch.DropDB(db, dbName)
+		branch.Check(err)
+		log.Printf("MySQL: Running: DROP DATABASE IF EXISTS %s;\n", dbName)
+		log.Printf("MySQL: Query OK, %d rows affected\n\n", numdrop)
 
-		user, err := db.Exec(fmt.Sprintf("DROP USER '%s'@'localhost';", dbName))
-		if err != nil {
-			log.Fatalf(err.Error())
-		} else {
-			count, _ := user.RowsAffected()
-			log.Printf("MySQL: Running: DROP USER '%s'@'localhost';\n", dbName)
-			log.Printf("MySQL: Query OK, %d rows affected\n\n", count)
-		}
+		numdropuser, err := branch.DropUser(db, dbName)
+		branch.Check(err)
+		log.Printf("MySQL: Running: DROP USER '%s'@'localhost';\n", dbName)
+		log.Printf("MySQL: Query OK, %d rows affected\n\n", numdropuser)
 
-		flush, err := db.Exec(fmt.Sprintf("FLUSH PRIVILEGES;"))
-		if err != nil {
-			log.Fatalf(err.Error())
-		} else {
-			count, _ := flush.RowsAffected()
-			log.Printf("MySQL: Running: FLUSH PRIVILEGES;")
-			log.Printf("MySQL: Query OK, %d rows affected\n\n", count)
-		}
+		numflush, err := branch.FlushPriv(db)
+		branch.Check(err)
+		log.Printf("MySQL: Running: FLUSH PRIVILEGES;")
+		log.Printf("MySQL: Query OK, %d rows affected\n\n", numflush)
 
 		// Remove virtual host directory
 		branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s", diffVal))

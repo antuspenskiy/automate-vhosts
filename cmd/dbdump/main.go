@@ -9,21 +9,19 @@ import (
 	"log"
 	"os/exec"
 	"time"
-	"os"
 
 	"github.com/antuspenskiy/automate-vhosts/pkg/branch"
 )
 
-var Usage = func() {
-	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-	flag.PrintDefaults()
-}
-
 var (
-	VERSION   = "undefined"
+	// VERSION used to show version of CLI
+	VERSION = "undefined"
+	// BUILDTIME used to show buildtime of CLI
 	BUILDTIME = "undefined"
-	COMMIT    = "undefined"
-	BRANCH    = "undefined"
+	// COMMIT used to show commit when CLI compiled
+	COMMIT = "undefined"
+	// BRANCH used to show branchname when CLI compiled
+	BRANCH = "undefined"
 )
 
 func main() {
@@ -41,6 +39,7 @@ func main() {
 		backupDir   = flag.String("backup-dir", "/opt/backup/db", "Backup directory for dumps.")
 		storageDir  = flag.String("storage-dir", "/mnt/backup", "Remote storage directory for dumps.")
 		gzipEnable  = flag.Bool("gzip", true, "If set gzip compression enabled.")
+		filename    string
 	)
 
 	// Get command line arguments
@@ -49,9 +48,8 @@ func main() {
 	// Get server hostname
 	hostname := branch.GetHostname()
 
-	filename := ""
 	current := time.Now()
-	now := fmt.Sprintf(current.Format("20060102.150405"))
+	now := current.Format("20060102.150405")
 
 	// Set Filename
 	if *allDatabase {

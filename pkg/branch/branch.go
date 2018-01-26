@@ -3,6 +3,7 @@ package branch
 import (
 	"bytes"
 	"compress/gzip"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,7 +18,6 @@ import (
 	"text/template"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
 )
 
@@ -171,40 +171,48 @@ func DirectoryExists(dir string) bool {
 	return true
 }
 
-// UnpackGzipFile extract sql.gz file
-func UnpackGzipFile(gzFilePath, dstFilePath string) (int64, error) {
-	gzFile, err := os.Open(gzFilePath)
+// Gunzip extract sql.gz file
+func Gunzip(gzfile string, gzfiledest string) {
+	// Open gzip file that we want to uncompress
+	// The file is a reader, but we could use any
+	// data source. It is common for web servers
+	// to return gzipped contents to save bandwidth
+	// and in that case the data is not in a file
+	// on the file system but is in a memory buffer
+	gzipFile, err := os.Open(gzfile)
 	if err != nil {
-		return 0, fmt.Errorf("failed to open file %s for unpack: %s", gzFilePath, err)
+		log.Fatal(err)
 	}
-	dstFile, err := os.OpenFile(dstFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660)
+	// Create a gzip reader on top of the file reader
+	// Again, it could be any type reader though
+	gzipReader, err := gzip.NewReader(gzipFile)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create destination file %s for unpack: %s", dstFilePath, err)
+		log.Fatal(err)
 	}
-
-	ioReader, ioWriter := io.Pipe()
-
-	go func() { // goroutine leak is possible here
-		gzReader, _ := gzip.NewReader(gzFile)
-		// it is important to close the writer or reading from the other end of the
-		// pipe or io.copy() will never finish
-		defer func() {
-			gzFile.Close()
-			gzReader.Close()
-			ioWriter.Close()
-		}()
-
-		io.Copy(ioWriter, gzReader)
+	defer func() {
+		err = gzipReader.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
 	}()
 
-	written, err := io.Copy(dstFile, ioReader)
+	// Uncompress to a writer. We'll use a file writer
+	outfileWriter, err := os.Create(gzfiledest)
 	if err != nil {
-		return 0, err // goroutine leak is possible here
+		log.Fatal(err)
 	}
-	ioReader.Close()
-	dstFile.Close()
+	defer func() {
+		err = outfileWriter.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}()
 
-	return written, nil
+	// Copy contents of gzipped file to output file
+	_, err = io.Copy(outfileWriter, gzipReader)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 // DeleteFile delete file
@@ -287,7 +295,12 @@ func IsTCPPortAvailable(port int) bool {
 	if err != nil {
 		return false
 	}
-	conn.Close()
+	defer func() {
+		err = conn.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}()
 	return true
 }
 
@@ -310,7 +323,12 @@ func WriteStringToFile(filepath, s string) error {
 		log.Fatalf("Error: %v\n\n", err)
 		return err
 	}
-	defer fo.Close()
+	defer func() {
+		err = fo.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}()
 
 	_, err = io.Copy(fo, strings.NewReader(s))
 	if err != nil {
@@ -363,4 +381,65 @@ func GetHostname() string {
 		log.Fatalf("error get server hostname: %v\n", err)
 	}
 	return hostname
+}
+
+// Check error checking
+func Check(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// DropSalary clear data before using database
+func DropSalary(db *sql.DB, dbname string) (int64, error) {
+	res, err := db.Exec(fmt.Sprintf("UPDATE %s.user_data SET salary = 10000, salary_proposed = 11000;", dbname))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// DropDB drop MySQL database
+func DropDB(db *sql.DB, dbname string) (int64, error) {
+	res, err := db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s;", dbname))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// DropUser drop user
+func DropUser(db *sql.DB, dbname string) (int64, error) {
+	res, err := db.Exec(fmt.Sprintf("DROP USER '%s'@'localhost';", dbname))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// CreateDB create MySQL database
+func CreateDB(db *sql.DB, dbname string) (int64, error) {
+	res, err := db.Exec(fmt.Sprintf("CREATE DATABASE %s CHARACTER SET utf8 collate utf8_unicode_ci;", dbname))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// GrantUserPriv grant user privileges to MySQL DB
+func GrantUserPriv(db *sql.DB, dbname string) (int64, error) {
+	res, err := db.Exec(fmt.Sprintf("GRANT ALL PRIVILEGES ON %s.* TO '%s'@'localhost' IDENTIFIED BY '%s';", dbname, dbname, dbname))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// FlushPriv flush the privileges
+func FlushPriv(db *sql.DB) (int64, error) {
+	res, err := db.Exec("FLUSH PRIVILEGES;")
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }

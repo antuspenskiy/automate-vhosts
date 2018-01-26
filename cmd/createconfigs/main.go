@@ -14,16 +14,15 @@ import (
 	"github.com/antuspenskiy/automate-vhosts/pkg/branch"
 )
 
-var Usage = func() {
-	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-	flag.PrintDefaults()
-}
-
 var (
-	VERSION   = "undefined"
+	// VERSION used to show version of CLI
+	VERSION = "undefined"
+	// BUILDTIME used to show buildtime of CLI
 	BUILDTIME = "undefined"
-	COMMIT    = "undefined"
-	BRANCH    = "undefined"
+	// COMMIT used to show commit when CLI compiled
+	COMMIT = "undefined"
+	// BRANCH used to show branchname when CLI compiled
+	BRANCH = "undefined"
 )
 
 func main() {
@@ -42,9 +41,7 @@ func main() {
 
 	// Load json configuration
 	conf, err := branch.ReadConfig("env")
-	if err != nil {
-		log.Fatalf("error when reading config: %v\n", err)
-	}
+	branch.Check(err)
 
 	// Get server hostname
 	hostname := branch.GetHostname()
@@ -71,7 +68,8 @@ func main() {
 		}
 
 		txt := branch.ParseTemplate(conf.GetString("server.nginxtmpl"), nginxData)
-		branch.WriteStringToFile(fmt.Sprintf("%s/%s.conf", conf.GetString("nginxdir"), *refSlug), txt)
+		err = branch.WriteStringToFile(fmt.Sprintf("%s/%s.conf", conf.GetString("nginxdir"), *refSlug), txt)
+		branch.Check(err)
 		log.Printf("Nginx configuration for %s/%s.conf created\n", conf.GetString("nginxdir"), *refSlug)
 	}
 
@@ -86,7 +84,10 @@ func main() {
 		}
 		// TODO: Refactor to func
 		writer := bufio.NewWriter(fileHandle)
-		defer fileHandle.Close()
+		defer func() {
+			err = fileHandle.Close()
+			branch.Check(err)
+		}()
 
 		fmt.Fprintln(writer, fmt.Sprintf("[%s]", *refSlug))
 		fmt.Fprintln(writer, fmt.Sprintf("listen = 127.0.0.1:%d", portphp))
@@ -96,13 +97,14 @@ func main() {
 		fmt.Fprintln(writer, "pm.max_requests = 500")
 		fmt.Fprintln(writer, "request_terminate_timeout = 65m")
 		fmt.Fprintln(writer, "php_admin_value[max_execution_time] = 300")
+		fmt.Fprintln(writer, "php_admin_value[sendmail_path] = false")
 
 		if strings.Contains(hostname, "intranet") {
 			fmt.Fprintln(writer, "php_admin_value[mbstring.func_overload] = 4")
 		}
 
-		fmt.Fprintln(writer, "php_admin_value[sendmail_path] = false")
-		writer.Flush()
+		err = writer.Flush()
+		branch.Check(err)
 
 		log.Printf("Php-fpm configuration for %s/%s.conf created\n", conf.GetString("fpmdir"), *refSlug)
 
@@ -150,7 +152,8 @@ func main() {
 				}
 
 				// Chown pm2 file with user.user permissions
-				os.Chown(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug), 1000, 1000)
+				err = os.Chown(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug), 1000, 1000)
+				branch.Check(err)
 
 				// Start pm2 process
 				branch.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s/%s.json", pm2Dir, *refSlug))
