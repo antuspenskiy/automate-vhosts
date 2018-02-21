@@ -1,7 +1,7 @@
 BINARY = /Users/auspenskii/Documents/go/bin
 GOARCH = amd64
 
-VERSION=1.0.6-beta
+VERSION=1.0.7-beta
 COMMIT=$(shell git rev-parse HEAD)
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 BUILDTIME=`date -u '+%Y-%m-%d_%I:%M:%S%p'`

@@ -56,14 +56,14 @@ func main() {
 
 	// Use Format for extracted file, so they don't conflicted
 	current := time.Now()
-	dumpFileDst := (fmt.Sprintf("%s/dump_%s.sql", conf.GetString("dbdir"), (current.Format("20060102.150405"))))
+	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", conf.GetString("dbdir"), current.Format("20060102.150405"))
 
 	if branch.DirectoryExists(conf.GetString("storagedir")) {
 		err = os.Chdir(conf.GetString("storagedir"))
 		branch.Check(err)
 
-		// Pipeline commands
-		dumpFile, err := exec.Command("/bin/bash", "-c", "find . -name '*.sql.gz' | tail -1").CombinedOutput()
+		// Get latest dump from storage dir
+		dumpFile, err := exec.Command("/bin/bash", "-c", "find . -name '*.sql.gz' -mtime -1").CombinedOutput()
 		branch.Check(err)
 		fmt.Printf("\nGet latest database dump:\n\n%s\n", dumpFile)
 

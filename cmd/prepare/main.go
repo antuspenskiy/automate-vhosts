@@ -65,7 +65,7 @@ func main() {
 
 	} else {
 		log.Printf("Create directory %s.\n\n", hostDir)
-		err = os.Mkdir(hostDir, 0700)
+		err = os.Mkdir(hostDir, 0750)
 		branch.Check(err)
 		err = os.Chdir(hostDir)
 		branch.Check(err)
