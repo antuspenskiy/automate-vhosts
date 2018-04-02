@@ -1,7 +1,7 @@
 BINARY = /Users/auspenskii/Documents/go/bin
 GOARCH = amd64
 
-VERSION=1.0.7-beta
+VERSION=1.0.8-beta
 COMMIT=$(shell git rev-parse HEAD)
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 BUILDTIME=`date -u '+%Y-%m-%d_%I:%M:%S%p'`
@@ -18,10 +18,9 @@ all: clean vet linux
 
 linux: 
 	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/dbimport-linux-${GOARCH} ${BUILD_DIR}/dbimport/main.go; \
-	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/dbdump-linux-${GOARCH} ${BUILD_DIR}/dbdump/main.go; \
 	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/prepare-linux-${GOARCH} ${BUILD_DIR}/prepare/main.go; \
 	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/createconfigs-linux-${GOARCH} ${BUILD_DIR}/createconfigs/main.go; \
-	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/deletestuff-linux-${GOARCH} ${BUILD_DIR}/deletestuff/main.go;
+	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/deletestuff-linux-${GOARCH} ${BUILD_DIR}/deletestuff/main.go; \
 
 vet:
 	cd ${BUILD_DIR}; \
@@ -33,7 +32,6 @@ fmt:
 
 clean:
 	rm -f ${BINARY}/dbimport-linux-*
-	rm -f ${BINARY}/dbdump-linux-*
 	rm -f ${BINARY}/prepare-linux-*
 	rm -f ${BINARY}/createconfigs-linux-*
 	rm -f ${BINARY}/deletestuff-linux-*

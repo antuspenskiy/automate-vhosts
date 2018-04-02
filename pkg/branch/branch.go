@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"text/template"
 	"time"
+	"archive/tar"
+	"path/filepath"
 
 	"github.com/spf13/viper"
 )
@@ -171,47 +173,100 @@ func DirectoryExists(dir string) bool {
 	return true
 }
 
-// Gunzip extract sql.gz file
-func Gunzip(gzfile string, gzfiledest string) {
-	// Open gzip file that we want to uncompress
-	// The file is a reader, but we could use any
-	// data source. It is common for web servers
-	// to return gzipped contents to save bandwidth
-	// and in that case the data is not in a file
-	// on the file system but is in a memory buffer
-	gzipFile, err := os.Open(gzfile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// Create a gzip reader on top of the file reader
-	// Again, it could be any type reader though
-	gzipReader, err := gzip.NewReader(gzipFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() {
-		err = gzipReader.Close()
-		if err != nil {
-			log.Fatalln(err)
+func FilePathWalkDir(root string) ([]string, error) {
+	var files []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			files = append(files, path)
 		}
-	}()
+		return nil
+	})
+	return files, err
+}
 
-	// Uncompress to a writer. We'll use a file writer
-	outfileWriter, err := os.Create(gzfiledest)
+// Gunzip extract sql.gz archive files to destination folder
+//func Gunzip(gzfile string, gzfiledest string) {
+//	// Open gzip file that we want to uncompress
+//	// The file is a reader, but we could use any
+//	// data source. It is common for web servers
+//	// to return gzipped contents to save bandwidth
+//	// and in that case the data is not in a file
+//	// on the file system but is in a memory buffer
+//	gzipFile, err := os.Open(gzfile)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	// Create a gzip reader on top of the file reader
+//	// Again, it could be any type reader though
+//	gzipReader, err := gzip.NewReader(gzipFile)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer func() {
+//		err = gzipReader.Close()
+//		if err != nil {
+//			log.Fatalln(err)
+//		}
+//	}()
+//
+//	// Uncompress to a writer. We'll use a file writer
+//	outfileWriter, err := os.Create(gzfiledest)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer func() {
+//		err = outfileWriter.Close()
+//		if err != nil {
+//			log.Fatalln(err)
+//		}
+//	}()
+//
+//	// Copy contents of gzipped file to output file
+//	_, err = io.Copy(outfileWriter, gzipReader)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//}
+
+// ExtractTarGz extracting *.tar.gz archives to destination folder
+func ExtractTarGz(tarFile string, tarExtractDst string) {
+	f, err := os.Open(tarFile)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Open file failed")
 	}
-	defer func() {
-		err = outfileWriter.Close()
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}()
+	defer f.Close()
 
-	// Copy contents of gzipped file to output file
-	_, err = io.Copy(outfileWriter, gzipReader)
+	gzf, err := gzip.NewReader(f)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Couldn't create gzip reader")
+	}
+	defer f.Close()
+
+	tarReader := tar.NewReader(gzf)
+
+	for true {
+
+		_, err := tarReader.Next()
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			log.Fatalf("Next() failed: %s", err.Error())
+		}
+
+		outFile, err := os.Create(tarExtractDst)
+		if err != nil {
+			log.Fatalf("Create() failed: %s", err.Error())
+		}
+		log.Printf("Create file %s", tarExtractDst)
+		defer outFile.Close()
+
+		if _, err := io.Copy(outFile, tarReader); err != nil {
+			log.Fatalf("Copy() failed: %s", err.Error())
+		}
+		log.Println("File extracted succefully")
 	}
 }
 

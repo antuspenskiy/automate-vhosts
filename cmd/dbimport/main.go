@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
+	"path"
+	"sort"
 
 	"github.com/antuspenskiy/automate-vhosts/pkg/branch"
 	_ "github.com/go-sql-driver/mysql"
@@ -33,12 +34,12 @@ func main() {
 
 	// Set the command line arguments
 	var (
-		refSlug       = flag.String("refslug", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
-		mysqlUser     = flag.String("user", "", "Name of your database user.")
-		mysqlPassword = flag.String("password", "", "Name of your database user password.")
-		mysqlHostname = flag.String("hostname", "localhost", "Name of your database hostname.")
-		mysqlPort     = flag.String("port", "3306", "Name of your database port.")
-		mysqlDatabase = flag.String("database", "", "Name of your database.")
+		refSlug= flag.String("refslug", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
+		mysqlUser= flag.String("user", "", "Name of your database user.")
+		mysqlPassword= flag.String("password", "", "Name of your database user password.")
+		mysqlHostname= flag.String("hostname", "localhost", "Name of your database hostname.")
+		mysqlPort= flag.String("port", "3306", "Name of your database port.")
+		mysqlDatabase= flag.String("database", "", "Name of your database.")
 	)
 
 	// Get command line arguments
@@ -56,83 +57,88 @@ func main() {
 
 	// Use Format for extracted file, so they don't conflicted
 	current := time.Now()
-	dumpFileDst := fmt.Sprintf("%s/dump_%s.sql", conf.GetString("dbdir"), current.Format("20060102.150405"))
+	tarExtractFile := fmt.Sprintf("dump_%s.sql", current.Format("20060102.150405"))
+	tarExtractDst := path.Join(conf.GetString("dbdir"), tarExtractFile)
 
-	if branch.DirectoryExists(conf.GetString("storagedir")) {
-		err = os.Chdir(conf.GetString("storagedir"))
+	// Get latest dump from storage dir
+	files, err := branch.FilePathWalkDir(conf.GetString("storagedir"))
+	branch.Check(err)
+
+	fname := make([]string, 0)
+	branch.Check(err)
+
+	for _, file := range files {
+		fname = append(fname, file)
+	}
+	// Sorting arrays
+	sort.Slice(fname, func(i, j int) bool {
+		return fname[i] < fname[j]
+	})
+	// Get last dump file
+	tarFile := fname[len(fname)-1]
+
+	err = os.Chdir(conf.GetString("storagedir"))
+	branch.Check(err)
+
+	// Copy last database dump to local directory
+	branch.RunCommand("rsync", "-P", "-t", tarFile, conf.GetString("dbdir"))
+
+	err = os.Chdir(conf.GetString("dbdir"))
+	branch.Check(err)
+
+	// Extract *.tar.gz archive
+	branch.ExtractTarGz(tarFile, tarExtractDst)
+
+	// Prepare database
+	// [user[:pass]@][protocol[(addr)]]/dbname[?p1=v1&...]
+	mysqlInfo := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
+		*mysqlUser, *mysqlPassword, *mysqlHostname, *mysqlPort, *mysqlDatabase)
+
+	db, err := sql.Open("mysql", mysqlInfo)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	defer func() {
+		err = db.Close()
 		branch.Check(err)
+	}()
 
-		// Get latest dump from storage dir
-		dumpFile, err := exec.Command("/bin/bash", "-c", "find . -name '*.sql.gz' -mtime -1").CombinedOutput()
-		branch.Check(err)
-		fmt.Printf("\nGet latest database dump:\n\n%s\n", dumpFile)
-
-		// Convert byte output to string
-		dumpFileStr := string(dumpFile[:])
-		dumpFileSrc := strings.TrimSpace(dumpFileStr)
-
-		// Copy last database dbdump to dbDir
-		branch.RunCommand("rsync", "-P", "-t", dumpFileSrc, conf.GetString("dbdir"))
-
-		err = os.Chdir(conf.GetString("dbdir"))
-		branch.Check(err)
-
-		// Extract database dbdump, use time() for each extracted file *.sql
-		branch.Gunzip(dumpFileSrc, dumpFileDst)
-
-		// Prepare database
-		// [user[:pass]@][protocol[(addr)]]/dbname[?p1=v1&...]
-		mysqlInfo := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
-			*mysqlUser, *mysqlPassword, *mysqlHostname, *mysqlPort, *mysqlDatabase)
-
-		db, err := sql.Open("mysql", mysqlInfo)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-		defer func() {
-			err = db.Close()
-			branch.Check(err)
-		}()
-
-		// make sure connection is available
-		err = db.Ping()
-		if err != nil {
-			log.Fatalf(err.Error())
-		} else {
-			log.Println("Successfully connected to MySQL!")
-		}
-
-		numdrop, err := branch.DropDB(db, dbName)
-		branch.Check(err)
-		log.Printf("MySQL: Running: DROP DATABASE IF EXISTS %s;\n", dbName)
-		log.Printf("MySQL: Query OK, %d rows affected\n\n", numdrop)
-
-		numcreate, err := branch.CreateDB(db, dbName)
-		branch.Check(err)
-		log.Printf("MySQL: Running: CREATE DATABASE %s CHARACTER SET utf8 collate utf8_unicode_ci;\n", dbName)
-		log.Printf("MySQL: Query OK, %d rows affected\n\n", numcreate)
-
-		numgrant, err := branch.GrantUserPriv(db, dbName)
-		branch.Check(err)
-		log.Printf("MySQL: Running: GRANT ALL PRIVILEGES ON %s.* TO '%s'@'localhost' IDENTIFIED BY '%s';\n", dbName, dbName, dbName)
-		log.Printf("MySQL: Query OK, %d rows affected\n\n", numgrant)
-
-		numflush, err := branch.FlushPriv(db)
-		branch.Check(err)
-		log.Printf("MySQL: Running: FLUSH PRIVILEGES;")
-		log.Printf("MySQL: Query OK, %d rows affected\n\n", numflush)
-
-		// Import database dump
-		branch.RunCommand("bash", "-c", fmt.Sprintf("time mysql -u%s %s < %s", *mysqlUser, dbName, dumpFileDst))
-
-		if strings.Contains(hostname, "ees") {
-			numsal, err := branch.DropSalary(db, dbName)
-			branch.Check(err)
-			log.Printf("MySQL: Running: UPDATE %s.user_data SET salary = 10000, salary_proposed = 11000;\n", dbName)
-			log.Printf("MySQL: Query OK, %d rows affected\n\n", numsal)
-		}
+	// make sure connection is available
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf(err.Error())
 	} else {
-		log.Fatalf("Error: No such file or directory %v\n", conf.GetString("storagedir"))
+		log.Println("Successfully connected to MySQL!")
+	}
+
+	numdrop, err := branch.DropDB(db, dbName)
+	branch.Check(err)
+	log.Printf("MySQL: Running: DROP DATABASE IF EXISTS %s;\n", dbName)
+	log.Printf("MySQL: Query OK, %d rows affected\n\n", numdrop)
+
+	numcreate, err := branch.CreateDB(db, dbName)
+	branch.Check(err)
+	log.Printf("MySQL: Running: CREATE DATABASE %s CHARACTER SET utf8 collate utf8_unicode_ci;\n", dbName)
+	log.Printf("MySQL: Query OK, %d rows affected\n\n", numcreate)
+
+	numgrant, err := branch.GrantUserPriv(db, dbName)
+	branch.Check(err)
+	log.Printf("MySQL: Running: GRANT ALL PRIVILEGES ON %s.* TO '%s'@'localhost' IDENTIFIED BY '%s';\n", dbName, dbName, dbName)
+	log.Printf("MySQL: Query OK, %d rows affected\n\n", numgrant)
+
+	numflush, err := branch.FlushPriv(db)
+	branch.Check(err)
+	log.Printf("MySQL: Running: FLUSH PRIVILEGES;")
+	log.Printf("MySQL: Query OK, %d rows affected\n\n", numflush)
+
+	// Import database dump
+	branch.RunCommand("bash", "-c", fmt.Sprintf("time mysql -u%s %s < %s", *mysqlUser, dbName, tarExtractDst))
+
+	if strings.Contains(hostname, "ees") {
+		numsal, err := branch.DropSalary(db, dbName)
+		branch.Check(err)
+		log.Printf("MySQL: Running: UPDATE %s.user_data SET salary = 10000, salary_proposed = 11000;\n", dbName)
+		log.Printf("MySQL: Query OK, %d rows affected\n\n", numsal)
 	}
 	// Delete database dbdump's
 	branch.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/*.sql*", conf.GetString("dbdir")))
