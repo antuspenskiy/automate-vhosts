@@ -119,7 +119,7 @@ prepare_import:
     - ssh-keyscan your_server_hostname | sort -u - ~/.ssh/known_hosts -o ~/.ssh/known_hosts
     - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
   script:
-    - ssh $SERVER_TEST /path/to/dbimport -refslug=$CI_COMMIT_REF_SLUG -user=$DBUSER -password=$DBPASSWORD
+    - import
   variables:
     GIT_STRATEGY: none
   only:
@@ -179,7 +179,7 @@ stop_review:
     - ssh-keyscan your_server_hostname | sort -u - ~/.ssh/known_hosts -o ~/.ssh/known_hosts
     - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
   script:
-    - ssh $SERVER_TEST sudo /path/to/deletestuff -refslug=$CI_COMMIT_REF_SLUG -user=$DBUSER -password=$DBPASSWORD
+    - av-remove
   variables:
     GIT_STRATEGY: none
   when: manual
