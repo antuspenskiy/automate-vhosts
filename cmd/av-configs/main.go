@@ -1,15 +1,11 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"os"
 	"strings"
+	"path"
 
 	"github.com/antuspenskiy/automate-vhosts/pkg/config"
 	"github.com/antuspenskiy/automate-vhosts/pkg/cmd"
@@ -45,83 +41,77 @@ func main() {
 	cmd.Check(err)
 
 	// Get server hostname
-	hostname := cmd.GetHostname()
+	hostName := cmd.GetHostname()
 
 	// Variables
-	hostDir := conf.GetString("rootdir") + *refSlug
-	pm2Dir := conf.GetString("server.pm2")
+	hostDir := path.Join(conf.GetString("rootdir"), *refSlug)
 
 	// Generate random port for nginx, php-fpm and pm2 configuration
-	portphp := config.RandomTCPPort()
-	portnode := config.RandomTCPPort()
+	portPhp := config.RandomTCPPort()
+	portNode := config.RandomTCPPort()
 
 	// Create nginx configuration for virtual host
-	if cmd.DirectoryExists(fmt.Sprintf("%s/%s.conf", conf.GetString("nginxdir"), *refSlug)) {
-		log.Printf("Nginx configuration for %s/%s.conf exist\n", conf.GetString("nginxdir"), *refSlug)
+	nginxConf := path.Join(conf.GetString("nginxdir"), *refSlug+".conf")
+
+	if cmd.DirectoryExists(nginxConf) {
+		log.Printf("Nginx configuration %s exist!\n", nginxConf)
 	} else {
 
 		// TODO: Refactor to func
 		nginxData := config.NginxTemplate{
 			ServerName: fmt.Sprintf("%s.%s", *refSlug, conf.GetString("subdomain")),
-			PortPhp:    portphp,
-			PortNode:   portnode,
+			PortPhp:    portNode,
+			PortNode:   portPhp,
 			RefSlug:    *refSlug,
 		}
 
 		txt := config.ParseTemplate(conf.GetString("server.nginxtmpl"), nginxData)
-		err = config.WriteStringToFile(fmt.Sprintf("%s/%s.conf", conf.GetString("nginxdir"), *refSlug), txt)
+		err = config.WriteStringToFile(nginxConf, txt)
 		cmd.Check(err)
-		log.Printf("Nginx configuration for %s/%s.conf created\n", conf.GetString("nginxdir"), *refSlug)
+		log.Printf("Nginx configuration %s created\n", nginxConf)
 	}
 
 	// Create php-fpm configuration
-	if cmd.DirectoryExists(fmt.Sprintf("%s/%s.conf", conf.GetString("fpmdir"), *refSlug)) {
-		log.Printf("Php-fpm configuration for %s/%s.conf exist\n", conf.GetString("fpmdir"), *refSlug)
+	fpmConf := path.Join(conf.GetString("fpmdir"), *refSlug+".conf")
+
+	if cmd.DirectoryExists(fpmConf) {
+		log.Printf("Php-fpm configuration %s exist!\n", fpmConf)
 	} else {
-		fileHandle, err := os.Create(fmt.Sprintf("%s/%s.conf", conf.GetString("fpmdir"), *refSlug))
-		if err != nil {
-			log.Println("Error creating configuration file:", err)
-			return
-		}
-		// TODO: Refactor to func
-		writer := bufio.NewWriter(fileHandle)
-		defer func() {
-			err = fileHandle.Close()
-			cmd.Check(err)
-		}()
+		m := make(map[string]string)
+		m["listen"] = fmt.Sprintf("127.0.0.1:%d\n", portPhp)
+		m["user"] = "user"
+		m["pm"] = "static"
+		m["pm.max_children"] = "2"
+		m["pm.max_requests"] = "500"
+		m["request_terminate_timeout"] = "65m"
+		m["php_admin_value[max_execution_time]"] = "300"
+		m["php_admin_value[sendmail_path]"] = "false"
 
-		fmt.Fprintln(writer, fmt.Sprintf("[%s]", *refSlug))
-		fmt.Fprintln(writer, fmt.Sprintf("listen = 127.0.0.1:%d", portphp))
-		fmt.Fprintln(writer, "user = user")
-		fmt.Fprintln(writer, "pm = static")
-		fmt.Fprintln(writer, "pm.max_children = 2")
-		fmt.Fprintln(writer, "pm.max_requests = 500")
-		fmt.Fprintln(writer, "request_terminate_timeout = 65m")
-		fmt.Fprintln(writer, "php_admin_value[max_execution_time] = 300")
-		fmt.Fprintln(writer, "php_admin_value[sendmail_path] = false")
-
-		if strings.Contains(hostname, "intranet") {
-			fmt.Fprintln(writer, "php_admin_value[mbstring.func_overload] = 4")
+		if strings.Contains(hostName, "intranet") {
+			m["php_admin_value[mbstring.func_overload]"] = "4"
 		}
 
-		err = writer.Flush()
-		cmd.Check(err)
+		fpm := config.FpmConfig{
+			Section: *refSlug,
+			Params:  m,
+		}
 
-		log.Printf("Php-fpm configuration for %s/%s.conf created\n", conf.GetString("fpmdir"), *refSlug)
-
+		fpm.Write(fpmConf)
+		log.Printf("Php-fpm configuration %s created\n", fpmConf)
 		cmd.RunCommand("bash", "-c", "systemctl restart nginx php-fpm")
 	}
 
 	// Create pm2 configuration for test-intranet
-	if strings.Contains(hostname, "intranet") {
-		if cmd.DirectoryExists(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug)) {
+	pm2Conf := path.Join(conf.GetString("server.pm2"), *refSlug+".json")
+
+	if strings.Contains(hostName, "intranet") {
+		if cmd.DirectoryExists(pm2Conf) {
 			// Don't reload process, delete it and start again
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 describe %s", *refSlug))
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 delete -s %s || :", *refSlug))
-			cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s/%s.json", pm2Dir, *refSlug))
+			cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s", pm2Conf))
 		} else {
-			var buf bytes.Buffer
-			pm2Conf := &config.Post{
+			pm2Data := config.PM2Config{
 				Apps: []config.App{
 					{
 						ExecMode: "fork_mode",
@@ -130,7 +120,7 @@ func main() {
 						Name:     *refSlug,
 						Cwd:      hostDir,
 						Env: config.Env{
-							Port:    portnode,
+							Port:    portNode,
 							NodeEnv: "development",
 						},
 						ErrorFile: fmt.Sprintf("log/%s.err.log", *refSlug),
@@ -138,30 +128,15 @@ func main() {
 					},
 				},
 			}
-			config.EncodeTo(&buf, pm2Conf)
 
-			// Pretty print json file
-			data, err := json.MarshalIndent(pm2Conf, "", " ")
-			if err != nil {
-				log.Fatalln("MarshalIndent:", err)
-			}
-			log.Printf("PM2 JSON configuration created:\n%s", data)
-
-			if fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug) != "" {
-				if err = ioutil.WriteFile(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug), data, 0644); err != nil {
-					log.Fatalln("WriteFile:", err)
-				}
-
-				// Chown pm2 file with user.user permissions
-				err = os.Chown(fmt.Sprintf("%s/%s.json", pm2Dir, *refSlug), 1000, 1000)
-				cmd.Check(err)
-
+			if pm2Data.Write(pm2Conf) {
+				log.Printf("Pm2 configuration created:\n%s", pm2Data.PrettyJson())
 				// Start pm2 process
-				cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s/%s.json", pm2Dir, *refSlug))
-
+				cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s", pm2Conf))
 			} else {
-				log.Printf("%s\n", string(data))
+				log.Println("Pm2 configuration not created!")
 			}
+
 		}
 	}
 }

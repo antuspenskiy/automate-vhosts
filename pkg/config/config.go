@@ -2,12 +2,12 @@ package config
 
 import (
 	"io"
-	"encoding/json"
 	"log"
 	"text/template"
 	"bytes"
 	"os"
 	"strings"
+	"encoding/json"
 
 	"github.com/spf13/viper"
 )
