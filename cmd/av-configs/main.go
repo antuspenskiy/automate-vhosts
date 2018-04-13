@@ -64,8 +64,7 @@ func main() {
 			TemplatePath: conf.GetString("server.nginxtmpl"),
 		}
 
-		err = nginxData.Write(nginxConf)
-		cmd.Check(err)
+		nginxData.Write(nginxConf)
 		log.Printf("Nginx configuration %s created\n", nginxConf)
 	}
 

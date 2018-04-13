@@ -10,7 +10,7 @@ type NginxTemplate struct {
 }
 
 // Write create nginx configuration files for virtual hosts
-func (t *NginxTemplate) Write(path string) error {
+func (t *NginxTemplate) Write(path string) {
 	conf := ParseTemplate(t.TemplatePath, t)
-	return WriteStringToFile(path, conf)
+	WriteStringToFile(path, conf)
 }
