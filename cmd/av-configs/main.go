@@ -56,8 +56,6 @@ func main() {
 	if cmd.DirectoryExists(nginxConf) {
 		log.Printf("Nginx configuration %s exist!\n", nginxConf)
 	} else {
-
-		// TODO: Refactor to func
 		nginxData := config.NginxTemplate{
 			ServerName:   fmt.Sprintf("%s.%s", *refSlug, conf.GetString("subdomain")),
 			PortPhp:      portNode,
@@ -131,14 +129,10 @@ func main() {
 				},
 			}
 
-			if pm2Data.Write(pm2Conf) {
-				log.Printf("Pm2 configuration created:\n%s", pm2Data.PrettyJson())
-				// Start pm2 process
-				cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s", pm2Conf))
-			} else {
-				log.Println("Pm2 configuration not created!")
-			}
-
+			pm2Data.Write(pm2Conf)
+			log.Printf("Pm2 configuration created:\n%s", pm2Data.PrettyJson())
+			// Start pm2 process
+			cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s", pm2Conf))
 		}
 	}
 }
