@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"path"
 
 	"github.com/antuspenskiy/automate-vhosts/pkg/cmd"
 	"github.com/antuspenskiy/automate-vhosts/pkg/config"
@@ -53,8 +54,7 @@ func main() {
 	hostname := cmd.GetHostname()
 
 	// Variables
-	hostDir := conf.GetString("rootdir") + *refSlug
-	pm2Dir := conf.GetString("rootdir") + conf.GetString("server.pm2")
+	hostDir := path.Join(conf.GetString("rootdir"), *refSlug)
 
 	// List remote branches, only 2nd row without refs/heads/
 	err = os.Chdir(hostDir)
@@ -136,10 +136,11 @@ func main() {
 		cmd.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", conf.GetString("fpmdir"), diffVal))
 
 		if strings.Contains(hostname, "intranet") {
+			pm2Conf := path.Join(conf.GetString("server.pm2"), diffVal+".json")
+
 			// Remove pm2 process and configuration file for virtual host
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 delete --silent %s", diffVal))
-			// TODO: Error in path 2018/04/13 14:03:21 run command: bash [-c rm -fr /var/web//var/web/pm2json/429-new-right-for-admins-ontest.json]
-			cmd.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.json", pm2Dir, diffVal))
+			cmd.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s", pm2Conf))
 		}
 	}
 	// Restart nginx and php-fpm
