@@ -59,14 +59,14 @@ func main() {
 
 		// TODO: Refactor to func
 		nginxData := config.NginxTemplate{
-			ServerName: fmt.Sprintf("%s.%s", *refSlug, conf.GetString("subdomain")),
-			PortPhp:    portNode,
-			PortNode:   portPhp,
-			RefSlug:    *refSlug,
+			ServerName:   fmt.Sprintf("%s.%s", *refSlug, conf.GetString("subdomain")),
+			PortPhp:      portNode,
+			PortNode:     portPhp,
+			RefSlug:      *refSlug,
+			TemplatePath: conf.GetString("server.nginxtmpl"),
 		}
 
-		txt := config.ParseTemplate(conf.GetString("server.nginxtmpl"), nginxData)
-		err = config.WriteStringToFile(nginxConf, txt)
+		err = nginxData.Write(nginxConf)
 		cmd.Check(err)
 		log.Printf("Nginx configuration %s created\n", nginxConf)
 	}
@@ -106,6 +106,8 @@ func main() {
 
 	if strings.Contains(hostName, "intranet") {
 		if cmd.DirectoryExists(pm2Conf) {
+			log.Printf("Pm2 configuration %s exist!\n", pm2Conf)
+
 			// Don't reload process, delete it and start again
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 describe %s", *refSlug))
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 delete -s %s || :", *refSlug))
