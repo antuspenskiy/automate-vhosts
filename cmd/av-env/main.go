@@ -107,8 +107,7 @@ func main() {
 	cmd.Deploy(conf.GetString("server.cmd-dir-not-exist"))
 
 	if strings.Contains(hostname, "intranet") {
-		if cmd.DirectoryExists(bxConf) || cmd.DirectoryExists(bxConn) {
-		} else {
+		if !cmd.DirectoryExists(bxConf) && !cmd.DirectoryExists(bxConn) {
 			log.Println("Run parse settings...")
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", bxConf, bxConf))
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", bxConn, bxConn))
