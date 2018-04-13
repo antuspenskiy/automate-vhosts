@@ -1,9 +1,9 @@
 package db
 
 import (
-	"regexp"
-	"log"
 	"fmt"
+	"log"
+	"regexp"
 )
 
 // ParseBranchName parse branch name symbols and lenght

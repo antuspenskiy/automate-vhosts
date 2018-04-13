@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// Post represent pm2 struct which contains an array of variables
+// PM2Config represent pm2 struct which contains an array of variables
 type PM2Config struct {
 	Apps []App `json:"apps"`
 }
@@ -30,7 +30,7 @@ type Env struct {
 
 // Write create pm2 json configuration and file permissions
 func (p *PM2Config) Write(path string) bool {
-	WriteJsonToFile(path, p)
+	WriteJSONToFile(path, p)
 	err := os.Chown(path, 1000, 1000)
 	if err != nil {
 		log.Fatal(err)

@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
-	"time"
 	"path"
 	"sort"
+	"strings"
+	"time"
 
-	"github.com/antuspenskiy/automate-vhosts/pkg/cmd"
-	"github.com/antuspenskiy/automate-vhosts/pkg/db"
-	"github.com/antuspenskiy/automate-vhosts/pkg/config"
 	"github.com/antuspenskiy/automate-vhosts/pkg/archive"
+	"github.com/antuspenskiy/automate-vhosts/pkg/cmd"
+	"github.com/antuspenskiy/automate-vhosts/pkg/config"
+	"github.com/antuspenskiy/automate-vhosts/pkg/db"
 )
 
 var (

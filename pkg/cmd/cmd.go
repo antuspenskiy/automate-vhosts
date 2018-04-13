@@ -3,11 +3,11 @@ package cmd
 import (
 	"bytes"
 	"log"
-	"os/exec"
-	"syscall"
-	"strings"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
+	"syscall"
 )
 
 const defaultFailedCode = 1
