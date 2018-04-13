@@ -1,13 +1,13 @@
 package config
 
 // BooksEnv JSON nested configuration for Books
-type BooksEnv struct {
+type BooksConfig struct {
 	Production  BooksConfigNested `json:"production"`
 	Development BooksConfigNested `json:"development"`
 }
 
 // BooksConfig JSON database settings in nested structure of BooksEnv
-type BooksConfig struct {
+type BooksEnv struct {
 	BaseName string `json:"BASE_NAME"`
 	UserName string `json:"USER_NAME"`
 	Password string `json:"PASSWORD"`
@@ -16,6 +16,10 @@ type BooksConfig struct {
 
 // BooksConfigNested extend JSON structure of BooksConfig
 type BooksConfigNested struct {
-	BooksConfig       BooksConfig `json:"BASE_CONFIG"`
-	ExternalServerAPI string      `json:"EXTERNAL_SERVER_API"`
+	BooksEnv          BooksEnv `json:"BASE_CONFIG"`
+	ExternalServerAPI string   `json:"EXTERNAL_SERVER_API"`
+}
+
+func (p BooksConfig) Write(path string) {
+	WriteJsonToFile(path, p)
 }

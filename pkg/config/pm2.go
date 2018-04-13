@@ -1,8 +1,6 @@
 package config
 
 import (
-	"io/ioutil"
-	"encoding/json"
 	"log"
 	"os"
 )
@@ -32,24 +30,10 @@ type Env struct {
 
 // Write create pm2 json configuration and file permissions
 func (p *PM2Config) Write(path string) bool {
-	data, _ := json.Marshal(p)
-	err := ioutil.WriteFile(path, data, 0644)
-	if err != nil {
-		log.Fatalln("WriteFile:", err)
-	}
-	// Chown pm2 file with user.user permissions
-	err = os.Chown(path, 1000, 1000)
+	WriteJsonToFile(path, p)
+	err := os.Chown(path, 1000, 1000)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return err != nil
-}
-
-// PrettyJson print json file
-func (p *PM2Config) PrettyJson() string {
-	data, err := json.MarshalIndent(p, "", " ")
-	if err != nil {
-		log.Fatalln("MarshalIndent:", err)
-	}
-	return string(data)
 }

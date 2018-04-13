@@ -1,11 +1,8 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -39,9 +36,10 @@ func main() {
 	bxConn := path.Join(hostDir, conf.GetString("server.dbconn"))
 	dbName := db.ParseBranchName(*refSlug)
 
+	// Checkout to commit, run deploy commands from env.json
 	if cmd.DirectoryExists(hostDir) {
-
 		log.Printf("Directory %s exists.\n\n", hostDir)
+
 		err = os.Chdir(hostDir)
 		cmd.Check(err)
 
@@ -57,12 +55,13 @@ func main() {
 		err = os.Chdir(hostDir)
 		cmd.Check(err)
 
+		booksConf := path.Join(hostDir, "env.json")
+
 		// Create node library configuration file, need before func Deploy()
 		if strings.Contains(hostname, "intranet") {
-			var buf bytes.Buffer
-			booksTemplate := &config.BooksEnv{
+			booksTemplate := &config.BooksConfig{
 				Production: config.BooksConfigNested{
-					BooksConfig: config.BooksConfig{
+					BooksEnv: config.BooksEnv{
 						BaseName: dbName,
 						UserName: dbName,
 						Password: dbName,
@@ -71,7 +70,7 @@ func main() {
 					ExternalServerAPI: "https://127.0.0.1",
 				},
 				Development: config.BooksConfigNested{
-					BooksConfig: config.BooksConfig{
+					BooksEnv: config.BooksEnv{
 						BaseName: dbName,
 						UserName: dbName,
 						Password: dbName,
@@ -80,45 +79,32 @@ func main() {
 					ExternalServerAPI: "https://127.0.0.1",
 				},
 			}
-			config.EncodeTo(&buf, booksTemplate)
-
-			// Pretty print json file
-			data, cerr := json.MarshalIndent(booksTemplate, "", " ")
-			if cerr != nil {
-				log.Fatalln("MarshalIndent:", cerr)
-			}
-			log.Printf("Library JSON configuration created:\n%s", data)
-
-			if fmt.Sprintf("%s/env.json", hostDir) != "" {
-				if err = ioutil.WriteFile(fmt.Sprintf("%s/env.json", hostDir), data, 0644); err != nil {
-					log.Fatalln("WriteFile:", err)
-				}
-			}
+			booksTemplate.Write(booksConf)
+			log.Printf("Library configuration %s created\n", booksConf)
+			config.PrettyJson(booksTemplate)
 		}
-
-		// Create environment .env for Laravel applications
-		if strings.Contains(hostname, "ees") {
-			laravelData := config.LaravelTemplate{
-				AppURL:     *refSlug,
-				DBDatabase: dbName,
-				DBUserName: dbName,
-				DBPassword: dbName,
-			}
-
-			log.Printf("Create environment file %s/.env\n", hostDir)
-
-			txt := config.ParseTemplate(conf.GetString("server.envtmpl"), laravelData)
-			err = config.WriteStringToFile(fmt.Sprintf("%s/.env", hostDir), txt)
-			cmd.Check(err)
-			log.Printf("Environment configuration for %s/.env created\n", hostDir)
-		}
-
-		cmd.RunCommand("bash", "-c", "git init")
-		cmd.RunCommand("bash", "-c", fmt.Sprintf("git remote add -t %s -f origin %s", *refSlug, conf.GetString("server.giturl")))
-		cmd.RunCommand("bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
-
-		cmd.Deploy(conf.GetString("server.cmd-dir-not-exist"))
 	}
+
+	// Create environment .env for Laravel applications
+	laravelConf := path.Join(hostDir, ".env")
+
+	if strings.Contains(hostname, "ees") {
+		laravelData := config.LaravelTemplate{
+			AppURL:       *refSlug,
+			DBDatabase:   dbName,
+			DBUserName:   dbName,
+			DBPassword:   dbName,
+			TemplatePath: conf.GetString("server.envtmpl"),
+		}
+		laravelData.Write(laravelConf)
+		log.Printf("Laravel environment configuration %s created\n", laravelConf)
+	}
+
+	cmd.RunCommand("bash", "-c", "git init")
+	cmd.RunCommand("bash", "-c", fmt.Sprintf("git remote add -t %s -f origin %s", *refSlug, conf.GetString("server.giturl")))
+	cmd.RunCommand("bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
+
+	cmd.Deploy(conf.GetString("server.cmd-dir-not-exist"))
 
 	if strings.Contains(hostname, "intranet") {
 		if cmd.DirectoryExists(bxConf) || cmd.DirectoryExists(bxConn) {
