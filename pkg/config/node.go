@@ -1,12 +1,12 @@
 package config
 
-// BooksEnv JSON nested configuration for Books
+// BooksConfig JSON nested configuration for Books
 type BooksConfig struct {
 	Production  BooksConfigNested `json:"production"`
 	Development BooksConfigNested `json:"development"`
 }
 
-// BooksConfig JSON database settings in nested structure of BooksEnv
+// BooksEnv JSON database settings in nested structure of BooksEnv
 type BooksEnv struct {
 	BaseName string `json:"BASE_NAME"`
 	UserName string `json:"USER_NAME"`
@@ -21,5 +21,5 @@ type BooksConfigNested struct {
 }
 
 func (p BooksConfig) Write(path string) {
-	WriteJsonToFile(path, p)
+	WriteJSONToFile(path, p)
 }

@@ -1,10 +1,10 @@
 package config
 
 import (
-	"net"
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"time"
 )
 

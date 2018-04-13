@@ -1,11 +1,11 @@
 package config
 
 import (
-	"log"
-	"text/template"
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"log"
+	"text/template"
 
 	"github.com/spf13/viper"
 )
@@ -20,8 +20,8 @@ func ReadConfig(filename string) (*viper.Viper, error) {
 	return v, err
 }
 
-// WriteJsonToFile write json file
-func WriteJsonToFile(path string, i interface{}) error {
+// WriteJSONToFile write json file
+func WriteJSONToFile(path string, i interface{}) error {
 	data, _ := json.Marshal(i)
 	err := ioutil.WriteFile(path, data, 0644)
 	if err != nil {
@@ -41,8 +41,8 @@ func WriteToFile(path string, s string) error {
 	return nil
 }
 
-// PrettyJson print json file in pretty format
-func PrettyJson(i interface{}) string {
+// PrettyJSON print json file in pretty format
+func PrettyJSON(i interface{}) string {
 	data, err := json.MarshalIndent(i, "", " ")
 	if err != nil {
 		log.Fatalln("MarshalIndent:", err)

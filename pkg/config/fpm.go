@@ -6,6 +6,7 @@ import (
 	"log"
 )
 
+// FpmConfig represent struct for php-fpm configuration files
 type FpmConfig struct {
 	Section string
 	Params  map[string]string

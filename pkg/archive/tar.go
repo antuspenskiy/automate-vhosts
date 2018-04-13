@@ -1,11 +1,11 @@
 package archive
 
 import (
-	"os"
-	"log"
-	"compress/gzip"
 	"archive/tar"
+	"compress/gzip"
 	"io"
+	"log"
+	"os"
 )
 
 // ExtractTarGz extracting *.tar.gz archives to destination folder

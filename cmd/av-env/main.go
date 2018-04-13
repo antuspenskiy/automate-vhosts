@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"path"
+	"strings"
 
-	"github.com/antuspenskiy/automate-vhosts/pkg/config"
 	"github.com/antuspenskiy/automate-vhosts/pkg/cmd"
+	"github.com/antuspenskiy/automate-vhosts/pkg/config"
 	"github.com/antuspenskiy/automate-vhosts/pkg/db"
 )
 
