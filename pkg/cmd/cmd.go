@@ -119,6 +119,6 @@ func DeleteFile(path string) {
 // Check error checking
 func Check(err error) {
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 }

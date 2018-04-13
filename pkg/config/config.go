@@ -1,13 +1,11 @@
 package config
 
 import (
-	"io"
 	"log"
 	"text/template"
 	"bytes"
-	"os"
-	"strings"
 	"encoding/json"
+	"io/ioutil"
 
 	"github.com/spf13/viper"
 )
@@ -22,34 +20,34 @@ func ReadConfig(filename string) (*viper.Viper, error) {
 	return v, err
 }
 
-// EncodeTo save configuration files in json
-func EncodeTo(w io.Writer, i interface{}) {
-	encoder := json.NewEncoder(w)
-	if err := encoder.Encode(i); err != nil {
-		log.Fatalf("failed encoding to writer: %s", err)
-	}
-}
-
-// WriteStringToFile save configuration files in filesystem
-func WriteStringToFile(filepath, s string) error {
-	fo, err := os.Create(filepath)
-	if err != nil {
-		log.Fatalf("Error: %v\n\n", err)
-		return err
-	}
-	defer func() {
-		err = fo.Close()
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}()
-
-	_, err = io.Copy(fo, strings.NewReader(s))
+// WriteJsonToFile write json file
+func WriteJsonToFile(path string, i interface{}) error {
+	data, _ := json.Marshal(i)
+	err := ioutil.WriteFile(path, data, 0644)
 	if err != nil {
 		log.Fatalf("Error: %v\n\n", err)
 		return err
 	}
 	return nil
+}
+
+// WriteToFile write file
+func WriteToFile(path string, s string) error {
+	err := ioutil.WriteFile(path, []byte(s), 0644)
+	if err != nil {
+		log.Fatalf("Error: %v\n\n", err)
+		return err
+	}
+	return nil
+}
+
+// PrettyJson print json file in pretty format
+func PrettyJson(i interface{}) string {
+	data, err := json.MarshalIndent(i, "", " ")
+	if err != nil {
+		log.Fatalln("MarshalIndent:", err)
+	}
+	return string(data)
 }
 
 // ParseTemplate is parse struct variables in different templates for configuration files

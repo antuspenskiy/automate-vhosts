@@ -9,8 +9,8 @@ type NginxTemplate struct {
 	TemplatePath string
 }
 
-// Write create nginx configuration files for virtual hosts
+// Write used to create nginx configuration files for virtual hosts
 func (t *NginxTemplate) Write(path string) {
 	conf := ParseTemplate(t.TemplatePath, t)
-	WriteStringToFile(path, conf)
+	WriteToFile(path, conf)
 }
