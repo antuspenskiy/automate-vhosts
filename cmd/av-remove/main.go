@@ -138,6 +138,7 @@ func main() {
 		if strings.Contains(hostname, "intranet") {
 			// Remove pm2 process and configuration file for virtual host
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 delete --silent %s", diffVal))
+			// TODO: Error in path 2018/04/13 14:03:21 run command: bash [-c rm -fr /var/web//var/web/pm2json/429-new-right-for-admins-ontest.json]
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.json", pm2Dir, diffVal))
 		}
 	}
