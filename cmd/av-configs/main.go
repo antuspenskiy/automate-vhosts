@@ -129,7 +129,7 @@ func main() {
 			}
 
 			pm2Data.Write(pm2Conf)
-			log.Printf("Pm2 configuration created:\n%s", config.PrettyJson(pm2Data))
+			log.Printf("Pm2 configuration created:\n%s", config.PrettyJSON(pm2Data))
 			// Start pm2 process
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 start %s", pm2Conf))
 		}
