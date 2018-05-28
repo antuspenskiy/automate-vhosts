@@ -1,7 +1,7 @@
 BINARY = /Users/auspenskii/Documents/go/bin
 GOARCH = amd64
 
-VERSION=1.0.8-beta
+VERSION=1.0.9-beta
 COMMIT=$(shell git rev-parse HEAD)
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 BUILDTIME=`date -u '+%Y-%m-%d_%I:%M:%S%p'`
@@ -17,10 +17,10 @@ LDFLAGS = -ldflags "-X main.VERSION=${VERSION} -X main.BUILDTIME=${BUILDTIME} -X
 all: clean vet linux
 
 linux: 
-	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/dbimport-linux-${GOARCH} ${BUILD_DIR}/dbimport/main.go; \
-	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/prepare-linux-${GOARCH} ${BUILD_DIR}/prepare/main.go; \
-	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/createconfigs-linux-${GOARCH} ${BUILD_DIR}/createconfigs/main.go; \
-	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/deletestuff-linux-${GOARCH} ${BUILD_DIR}/deletestuff/main.go; \
+	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/dbimport-linux-${GOARCH} ${BUILD_DIR}/av-import/main.go; \
+	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/prepare-linux-${GOARCH} ${BUILD_DIR}/av-env/main.go; \
+	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/createconfigs-linux-${GOARCH} ${BUILD_DIR}/av-configs/main.go; \
+	GOOS=linux GOARCH=${GOARCH} go build -i ${LDFLAGS} -o ${BINARY}/deletestuff-linux-${GOARCH} ${BUILD_DIR}/av-remove/main.go; \
 
 vet:
 	cd ${BUILD_DIR}; \
