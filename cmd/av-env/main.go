@@ -13,7 +13,23 @@ import (
 	"github.com/antuspenskiy/automate-vhosts/pkg/db"
 )
 
+var (
+	// VERSION used to show version of CLI
+	VERSION = "undefined"
+	// BUILDTIME used to show buildtime of CLI
+	BUILDTIME = "undefined"
+	// COMMIT used to show commit when CLI compiled
+	COMMIT = "undefined"
+	// BRANCH used to show branchname when CLI compiled
+	BRANCH = "undefined"
+)
+
 func main() {
+	fmt.Printf("Version    : %s\n", VERSION)
+	fmt.Printf("Git Hash   : %s\n", COMMIT)
+	fmt.Printf("Build Time : %s\n", BUILDTIME)
+	fmt.Printf("Branch     : %s\n\n", BRANCH)
+
 	// Set the command line arguments
 	var (
 		refSlug   = flag.String("refslug", "", "Lowercased, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.")
@@ -81,7 +97,7 @@ func main() {
 			}
 			booksTemplate.Write(booksConf)
 			log.Printf("Library configuration %s created\n", booksConf)
-			config.PrettyJson(booksTemplate)
+			config.PrettyJSON(booksTemplate)
 		}
 	}
 
@@ -109,8 +125,8 @@ func main() {
 	if strings.Contains(hostname, "intranet") {
 		if !cmd.DirectoryExists(bxConf) && !cmd.DirectoryExists(bxConn) {
 			log.Println("Run parse settings...")
-			cmd.RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", bxConf, bxConf))
-			cmd.RunCommand("bash", "-c", fmt.Sprintf("cp %s.example %s", bxConn, bxConn))
+			cmd.RunCommand("bash", "-c", fmt.Sprintf("cp %s .settings.php", bxConf))
+			cmd.RunCommand("bash", "-c", fmt.Sprintf("cp %s dbconn.php", bxConn))
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("php -f %s %s %s %s", conf.GetString("server.parse"), hostDir, dbName, dbName))
 			log.Println("Parse complete.")
 		}
