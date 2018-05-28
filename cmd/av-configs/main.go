@@ -58,8 +58,8 @@ func main() {
 	} else {
 		nginxData := config.NginxTemplate{
 			ServerName:   fmt.Sprintf("%s.%s", *refSlug, conf.GetString("subdomain")),
-			PortPhp:      portNode,
-			PortNode:     portPhp,
+			PortPhp:      portPhp,
+			PortNode:     portNode,
 			RefSlug:      *refSlug,
 			TemplatePath: conf.GetString("server.nginxtmpl"),
 		}
