@@ -97,7 +97,7 @@ func main() {
 			}
 			booksTemplate.Write(booksConf)
 			log.Printf("Library configuration %s created\n", booksConf)
-			config.PrettyJSON(booksTemplate)
+			config.PrettyJSON(booksConf)
 		}
 	}
 
