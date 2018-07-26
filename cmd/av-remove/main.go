@@ -7,8 +7,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
 	"strings"
+	"path/filepath"
 
 	"github.com/antuspenskiy/automate-vhosts/pkg/cmd"
 	"github.com/antuspenskiy/automate-vhosts/pkg/config"
@@ -54,7 +54,7 @@ func main() {
 	hostname := cmd.GetHostname()
 
 	// Variables
-	hostDir := path.Join(conf.GetString("rootdir"), *refSlug)
+	hostDir := filepath.Join(conf.GetString("rootdir"), *refSlug)
 
 	// List remote branches, only 2nd row without refs/heads/
 	err = os.Chdir(hostDir)
@@ -136,7 +136,7 @@ func main() {
 		cmd.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/%s.conf", conf.GetString("fpmdir"), diffVal))
 
 		if strings.Contains(hostname, "intranet") {
-			pm2Conf := path.Join(conf.GetString("server.pm2"), diffVal+".json")
+			pm2Conf := filepath.Join(conf.GetString("server.pm2"), diffVal+".json")
 
 			// Remove pm2 process and configuration file for virtual host
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("sudo -u user pm2 delete --silent %s", diffVal))
