@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"strings"
+	"path/filepath"
 
 	"github.com/antuspenskiy/automate-vhosts/pkg/cmd"
 	"github.com/antuspenskiy/automate-vhosts/pkg/config"
@@ -47,9 +47,9 @@ func main() {
 	hostname := cmd.GetHostname()
 
 	// Variables
-	hostDir := path.Join(conf.GetString("rootdir"), *refSlug)
-	bxConf := path.Join(hostDir, conf.GetString("server.settings"))
-	bxConn := path.Join(hostDir, conf.GetString("server.dbconn"))
+	hostDir := filepath.Join(conf.GetString("rootdir"), *refSlug)
+	bxConfDir := filepath.Join(hostDir, conf.GetString("server.settings-dir"))
+	bxConnDir := filepath.Join(hostDir, conf.GetString("server.dbconn-dir"))
 	dbName := db.ParseBranchName(*refSlug)
 
 	// Checkout to commit, run deploy commands from env.json
@@ -71,7 +71,7 @@ func main() {
 		err = os.Chdir(hostDir)
 		cmd.Check(err)
 
-		booksConf := path.Join(hostDir, "env.json")
+		booksConf := filepath.Join(hostDir, "env.json")
 
 		// Create node library configuration file, need before func Deploy()
 		if strings.Contains(hostname, "intranet") {
@@ -99,34 +99,35 @@ func main() {
 			log.Printf("Library configuration %s created\n", booksConf)
 			config.PrettyJSON(booksConf)
 		}
-	}
 
-	// Create environment .env for Laravel applications
-	laravelConf := path.Join(hostDir, ".env")
+		// Create environment .env for Laravel applications
+		laravelConf := filepath.Join(hostDir, ".env")
 
-	if strings.Contains(hostname, "ees") {
-		laravelData := config.LaravelTemplate{
-			AppURL:       *refSlug,
-			DBDatabase:   dbName,
-			DBUserName:   dbName,
-			DBPassword:   dbName,
-			TemplatePath: conf.GetString("server.envtmpl"),
+		if strings.Contains(hostname, "ees") {
+			laravelData := config.LaravelTemplate{
+				AppURL:       *refSlug,
+				DBDatabase:   dbName,
+				DBUserName:   dbName,
+				DBPassword:   dbName,
+				TemplatePath: conf.GetString("server.envtmpl"),
+			}
+			laravelData.Write(laravelConf)
+			log.Printf("Laravel environment configuration %s created\n", laravelConf)
 		}
-		laravelData.Write(laravelConf)
-		log.Printf("Laravel environment configuration %s created\n", laravelConf)
+
+		cmd.RunCommand("bash", "-c", "git init")
+		cmd.RunCommand("bash", "-c", fmt.Sprintf("git remote add -t %s -f origin %s", *refSlug, conf.GetString("server.giturl")))
+		cmd.RunCommand("bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
+
+		cmd.Deploy(conf.GetString("server.cmd-dir-not-exist"))
+
 	}
-
-	cmd.RunCommand("bash", "-c", "git init")
-	cmd.RunCommand("bash", "-c", fmt.Sprintf("git remote add -t %s -f origin %s", *refSlug, conf.GetString("server.giturl")))
-	cmd.RunCommand("bash", "-c", fmt.Sprintf("git checkout %s", *commitSha))
-
-	cmd.Deploy(conf.GetString("server.cmd-dir-not-exist"))
 
 	if strings.Contains(hostname, "intranet") {
-		if !cmd.DirectoryExists(bxConf) && !cmd.DirectoryExists(bxConn) {
+		if !cmd.DirectoryExists(bxConfDir + ".settings.php") && !cmd.DirectoryExists(bxConnDir + "dbconn.php") {
 			log.Println("Run parse settings...")
-			cmd.RunCommand("bash", "-c", fmt.Sprintf("cp %s .settings.php", bxConf))
-			cmd.RunCommand("bash", "-c", fmt.Sprintf("cp %s dbconn.php", bxConn))
+			cmd.RunCommand("bash", "-c", fmt.Sprintf("cp %s %s", filepath.Join(bxConfDir, ".settings.php.test-example"), filepath.Join(bxConfDir, ".settings.php")))
+			cmd.RunCommand("bash", "-c", fmt.Sprintf("cp %s %s", filepath.Join(bxConnDir, "dbconn.php.test-example"), filepath.Join(bxConnDir, "dbconn.php")))
 			cmd.RunCommand("bash", "-c", fmt.Sprintf("php -f %s %s %s %s", conf.GetString("server.parse"), hostDir, dbName, dbName))
 			log.Println("Parse complete.")
 		}
