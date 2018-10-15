@@ -1,4 +1,4 @@
-BINARY = /Users/auspenskii/Documents/go/bin
+BINARY = /Users/auspenskii/go/bin
 GOARCH = amd64
 
 VERSION=1.0.10
