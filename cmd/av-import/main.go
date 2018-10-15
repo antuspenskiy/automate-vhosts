@@ -144,5 +144,5 @@ func main() {
 		log.Printf("MySQL: Query OK, %d rows affected\n\n", numsal)
 	}
 	// Delete database dbdump's
-	cmd.RunCommand("bash", "-c", fmt.Sprintf("rm -fr %s/*.sql*", conf.GetString("dbdir")))
+	cmd.RunCommand("bash", "-c", fmt.Sprintf("rm -r %s/*", conf.GetString("dbdir")))
 }
